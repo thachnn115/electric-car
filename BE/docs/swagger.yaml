@@ -1,0 +1,373 @@
+openapi: 3.0.1
+info:
+  title: Electric Car API
+  version: "1.0.0"
+  description: API backend (auth, users, products, categories, cart, checkout, orders, discounts)
+servers:
+  - url: http://localhost:5000/api/v1
+tags:
+  - name: Auth
+  - name: Users
+  - name: Products
+  - name: Categories
+  - name: Cart
+  - name: Checkout
+  - name: Orders
+  - name: Discounts
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: Created
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: OK
+  /auth/logout:
+    get:
+      tags: [Auth]
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List products (public)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Products]
+      summary: Create product (admin)
+      responses:
+        "201":
+          description: Created
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [Products]
+      summary: Update product (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Products]
+      summary: Delete product (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /public/categories:
+    get:
+      tags: [Categories]
+      summary: List categories (public)
+      responses:
+        "200":
+          description: OK
+  /public/categories/{slug}/products:
+    get:
+      tags: [Categories]
+      summary: List products by category slug or id (public)
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List categories (admin allowed)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Categories]
+      summary: Create category (admin)
+      responses:
+        "201":
+          description: Created
+  /categories/{id}:
+    get:
+      tags: [Categories]
+      summary: Get category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [Categories]
+      summary: Update category (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Categories]
+      summary: Delete category (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Get my cart
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Cart]
+      summary: Add to cart
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [Cart]
+      summary: Update cart item quantity
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Cart]
+      summary: Clear cart
+      responses:
+        "200":
+          description: OK
+  /cart/item:
+    delete:
+      tags: [Cart]
+      summary: Remove one item
+      responses:
+        "200":
+          description: OK
+
+  /checkout/vnpay:
+    post:
+      tags: [Checkout]
+      summary: Create order from cart (VNPay or COD)
+      responses:
+        "201":
+          description: Created
+  /checkout/vnpay-return:
+    get:
+      tags: [Checkout]
+      summary: VNPay return URL
+      responses:
+        "200":
+          description: OK
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Get all orders (admin)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Orders]
+      summary: Create order (user) - existing placeholder
+      responses:
+        "200":
+          description: OK
+  /orders/showAllMyOrders:
+    get:
+      tags: [Orders]
+      summary: Get my orders
+      responses:
+        "200":
+          description: OK
+  /orders/admin/offline:
+    post:
+      tags: [Orders]
+      summary: Create offline order (admin)
+      responses:
+        "201":
+          description: Created
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get order detail (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [Orders]
+      summary: Update order status/payment (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Orders]
+      summary: Delete order (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /discounts:
+    get:
+      tags: [Discounts]
+      summary: List discounts (admin)
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Discounts]
+      summary: Create discount (admin)
+      responses:
+        "201":
+          description: Created
+  /discounts/{id}:
+    get:
+      tags: [Discounts]
+      summary: Get discount (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [Discounts]
+      summary: Update discount (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Discounts]
+      summary: Delete discount (admin)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        avatar:
+          type: string
+        gender:
+          type: string
+          enum: [male, female, other, ""]
+        dateOfBirth:
+          type: string
+          format: date
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string

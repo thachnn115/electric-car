@@ -10,12 +10,17 @@ const {
   createOrder,
   updateOrder,
   deleteOrder,
+  createOrderOfflineAdmin,
 } = require("../controllers/orderController")
 
 router
   .route("/")
   .post(authenticateUser, createOrder)
   .get(authenticateUser, authorizePermissions("admin"), getAllOrders)
+
+router
+  .route("/admin/offline")
+  .post(authenticateUser, authorizePermissions("admin"), createOrderOfflineAdmin)
 
 router.route("/showAllMyOrders").get(authenticateUser, getCurrentUserOrder)
 

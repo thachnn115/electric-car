@@ -1,7 +1,62 @@
 const Order = require("../models/orderModel")
+const Product = require("../models/productModel")
+const Discount = require("../models/discountModel")
 const CustomError = require("../errors")
 const { StatusCodes } = require("http-status-codes")
 const { checkPermissions } = require("../utils")
+
+const calculateTotals = (items, discountDoc) => {
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  let discountValue = 0
+
+  if (discountDoc) {
+    if (subtotal < (discountDoc.minOrder || 0)) {
+      throw new CustomError.BadRequestError("Order does not meet minimum for discount")
+    }
+    if (discountDoc.discountType === "percent") {
+      discountValue = Math.floor((subtotal * discountDoc.discountValue) / 100)
+      if (discountDoc.maxDiscount) {
+        discountValue = Math.min(discountValue, discountDoc.maxDiscount)
+      }
+    } else {
+      discountValue = discountDoc.discountValue
+    }
+  }
+
+  const shippingFee = 0
+  const tax = 0
+  const total = subtotal + shippingFee + tax
+  const finalTotal = Math.max(total - discountValue, 0)
+
+  return { subtotal, discountValue, shippingFee, tax, total, finalTotal }
+}
+
+const buildItemsFromRequest = async (items = []) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new CustomError.BadRequestError("Please provide order items")
+  }
+  const built = []
+  for (const item of items) {
+    const { productId, quantity, color } = item
+    if (!productId || !quantity || !color) {
+      throw new CustomError.BadRequestError("Each item needs productId, quantity, color")
+    }
+    const product = await Product.findById(productId)
+    if (!product) throw new CustomError.NotFoundError(`Product not found: ${productId}`)
+    if (product.stock < quantity) {
+      throw new CustomError.BadRequestError(`Not enough stock for ${product.name}`)
+    }
+    built.push({
+      product: product._id,
+      name: product.name,
+      price: product.price,
+      quantity: Number(quantity),
+      color,
+      image: product.images?.[0] || "",
+    })
+  }
+  return built
+}
 
 // ** ===================  GET ALL ORDERS  ===================
 const getAllOrders = async (req, res) => {
@@ -28,7 +83,9 @@ const getSingleOrder = async (req, res) => {
 
 // ** ===================  GET CURRENT USER ORDERS  ===================
 const getCurrentUserOrder = async (req, res) => {
-  const orders = await Order.find({ user: req.user.userId }).sort("-createdAt")
+  const orders = await Order.find({ user: req.user.userId })
+    .populate("orderItems.product", "name price images colors")
+    .sort("-createdAt")
   res.status(StatusCodes.OK).json({ total_orders: orders.length, orders })
 }
 
@@ -106,6 +163,59 @@ const deleteOrder = async (req, res) => {
   res.status(StatusCodes.OK).json({ msg: "Order deleted" })
 }
 
+// ** ===================  CREATE ORDER OFFLINE (ADMIN)  ===================
+const createOrderOfflineAdmin = async (req, res) => {
+  const { items, discountCode, userId, userName, userEmail, userPhone, shippingAddress, paymentStatus, status, paymentMethod } =
+    req.body
+
+  // build items from product ids and validate stock
+  const orderItems = await buildItemsFromRequest(items)
+
+  // validate discount
+  let discountDoc = null
+  if (discountCode) {
+    discountDoc = await Discount.findOne({ code: discountCode.toUpperCase(), isActive: true })
+    const now = new Date()
+    if (!discountDoc) throw new CustomError.BadRequestError("Invalid discount code")
+    if (discountDoc.startDate && discountDoc.startDate > now) {
+      throw new CustomError.BadRequestError("Discount not started")
+    }
+    if (discountDoc.endDate && discountDoc.endDate < now) {
+      throw new CustomError.BadRequestError("Discount expired")
+    }
+    if (discountDoc.usageLimit && discountDoc.usedCount >= discountDoc.usageLimit) {
+      throw new CustomError.BadRequestError("Discount usage limit reached")
+    }
+  }
+
+  const { subtotal, discountValue, shippingFee, tax, total, finalTotal } = calculateTotals(orderItems, discountDoc)
+
+  const order = await Order.create({
+    user: userId || req.user.userId,
+    userName: userName || req.user.name,
+    userEmail: userEmail || "",
+    userPhone: userPhone || "",
+    shippingAddress: shippingAddress || "",
+    orderItems,
+    subtotal,
+    discount: discountValue,
+    discountCode: discountDoc ? discountDoc.code : "",
+    shippingFee,
+    tax,
+    total,
+    finalTotal,
+    status: status || "confirmed",
+    paymentStatus: paymentStatus || "paid",
+    paymentMethod: paymentMethod || "OFFLINE",
+  })
+
+  if (discountDoc) {
+    await Discount.findOneAndUpdate({ code: discountDoc.code }, { $inc: { usedCount: 1 } }, { new: true })
+  }
+
+  res.status(StatusCodes.CREATED).json({ order })
+}
+
 module.exports = {
   getAllOrders,
   getSingleOrder,
@@ -113,4 +223,5 @@ module.exports = {
   createOrder,
   updateOrder,
   deleteOrder,
+  createOrderOfflineAdmin,
 }

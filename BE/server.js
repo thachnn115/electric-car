@@ -16,10 +16,16 @@ const reviewRouter = require("./routes/reviewRoutes")
 const orderRouter = require("./routes/orderRoutes")
 const categoryRouter = require("./routes/categoryRoutes")
 const discountRouter = require("./routes/discountRoutes")
+const cartRouter = require("./routes/cartRoutes")
+const publicCategoryRouter = require("./routes/publicCategoryRoutes")
+const checkoutRouter = require("./routes/checkoutRoutes")
 
 // Middleware
 const notFoundMiddleware = require("./middleware/not-found")
 const errorHandlerMiddleware = require("./middleware/error-handler")
+const swaggerUi = require("swagger-ui-express")
+const YAML = require("yamljs")
+const swaggerDocument = YAML.load("./docs/swagger.yaml")
 
 // Extra
 app.use(morgan("tiny"))
@@ -44,6 +50,10 @@ app.use("/api/v1/reviews", reviewRouter)
 app.use("/api/v1/orders", orderRouter)
 app.use("/api/v1/categories", categoryRouter)
 app.use("/api/v1/discounts", discountRouter)
+app.use("/api/v1/cart", cartRouter)
+app.use("/api/v1/public/categories", publicCategoryRouter)
+app.use("/api/v1/checkout", checkoutRouter)
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument))
 
 // Middleware
 app.use(notFoundMiddleware)

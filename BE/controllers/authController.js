@@ -5,7 +5,7 @@ const { createTokenUser, attachCookiesToResponse } = require("../utils")
 
 // Register User
 const register = async (req, res) => {
-  const { name, email, password } = req.body
+  const { name, email, password, phone, address, avatar, gender, dateOfBirth } = req.body
   if (!name || !email || !password) {
     throw new CustomError.BadRequestError("Please provide name, email, and password")
   }
@@ -15,7 +15,7 @@ const register = async (req, res) => {
   }
   const isFirstAccount = (await User.countDocuments({})) === 0
   const role = isFirstAccount ? "admin" : "user"
-  const user = await User.create({ name, email, password, role })
+  const user = await User.create({ name, email, password, role, phone, address, avatar, gender, dateOfBirth })
   const tokenUser = createTokenUser(user)
   attachCookiesToResponse({ res, user: tokenUser })
   res.status(StatusCodes.CREATED).json({ user: tokenUser })

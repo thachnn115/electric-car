@@ -18,7 +18,7 @@ const { getSingleProductReviews } = require("../controllers/reviewController")
 router
   .route("/")
   .post([authenticateUser, authorizePermissions("admin")], createProduct)
-  .get(getAllProducts)
+  .get(getAllProducts) // public: user xem sản phẩm
 
 router
   .route("/admin")
