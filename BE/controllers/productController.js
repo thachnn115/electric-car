@@ -1,9 +1,26 @@
 const Product = require("../models/productModel")
 const CustomError = require("../errors")
 const { StatusCodes } = require("http-status-codes")
-const { uploadBuffer } = require("../utils/cloudinary")
+const fs = require("fs")
+const path = require("path")
 
 const normalizeToArray = (value) => (Array.isArray(value) ? value : [value])
+const uploadsDir = path.join(__dirname, "../public/uploads")
+
+const ensureUploadsDir = () => {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true })
+  }
+}
+
+const saveLocalFile = async (file, prefix = "file") => {
+  ensureUploadsDir()
+  const sanitizedName = file.name.replace(/\s+/g, "-")
+  const filename = `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e6)}-${sanitizedName}`
+  const filePath = path.join(uploadsDir, filename)
+  await file.mv(filePath)
+  return `/uploads/${filename}`
+}
 
 // ** ===================  CREATE PRODUCT  ===================
 const createProduct = async (req, res) => {
@@ -14,16 +31,14 @@ const createProduct = async (req, res) => {
   if (typeof body.images === "string") body.images = JSON.parse(body.images)
   if (typeof body.specs === "string") body.specs = JSON.parse(body.specs)
 
-  // Upload gallery images to Cloudinary if provided via form-data under key "gallery"
+  // Upload gallery images locally if provided via form-data under key "gallery"
   if (req.files && req.files.gallery) {
     const galleryFiles = normalizeToArray(req.files.gallery)
-    const uploads = await Promise.all(
-      galleryFiles.map((file) => uploadBuffer(file.data, { folder: "electric-car/products/gallery" }))
-    )
-    body.images = uploads.map((u) => u.secure_url)
+    const uploads = await Promise.all(galleryFiles.map((file) => saveLocalFile(file, "gallery")))
+    body.images = uploads
   }
 
-  // Upload color images to Cloudinary if provided via form-data under key "colorImages"
+  // Upload color images locally if provided via form-data under key "colorImages"
   if (req.files && req.files.colorImages) {
     if (!body.colors || !Array.isArray(body.colors)) {
       throw new CustomError.BadRequestError("Please provide colors array to map colorImages")
@@ -32,12 +47,10 @@ const createProduct = async (req, res) => {
     if (colorFiles.length !== body.colors.length) {
       throw new CustomError.BadRequestError("colorImages count must match colors length")
     }
-    const uploads = await Promise.all(
-      colorFiles.map((file) => uploadBuffer(file.data, { folder: "electric-car/products/colors" }))
-    )
+    const uploads = await Promise.all(colorFiles.map((file) => saveLocalFile(file, "color")))
     body.colors = body.colors.map((color, idx) => ({
       ...color,
-      image: uploads[idx].secure_url,
+      image: uploads[idx],
     }))
   }
 
@@ -165,13 +178,10 @@ const uploadImage = async (req, res) => {
     throw new CustomError.BadRequestError("Please upload image file")
   }
 
-  const uploaded = await uploadBuffer(productImage.data, {
-    folder: "electric-car/products/single",
-  })
+  const imagePath = await saveLocalFile(productImage, "single")
 
   res.status(StatusCodes.OK).json({
-    image: uploaded.secure_url,
-    public_id: uploaded.public_id,
+    image: imagePath,
   })
 }
 
