@@ -6,41 +6,44 @@ import { Star, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import type { Product } from "@/lib/mock-data"
-import { formatCurrency } from "@/lib/mock-data"
+import type { Product } from "@/lib/types"
+import { formatCurrency, getProductImageUrl } from "@/lib/utils"
+import { hasDiscount, calculateDiscountPercent } from "@/lib/product-helpers"
 
 interface ProductCardProps {
-  product: Product
+  readonly product: Product
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
-  const discountPercent = hasDiscount
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
+  const productHasDiscount = hasDiscount(product)
+  const discountPercent = productHasDiscount && product.originalPrice
+    ? calculateDiscountPercent(product.originalPrice, product.price)
     : 0
 
   return (
-    <Card className="group overflow-hidden border-border/50 hover:border-primary/50 transition-colors">
-      <Link href={`/products/${product.id}`}>
+    <Card className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+      <Link href={`/products/${product._id}`}>
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           <Image
-            src={product.images[0] || "/placeholder.svg"}
+            src={getProductImageUrl(product.images[0] || "")}
             alt={product.name}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover transition-transform duration-500 group-hover:scale-110"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
-          {hasDiscount && (
-            <Badge variant="destructive" className="absolute top-3 left-3">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {productHasDiscount && discountPercent > 0 && (
+            <Badge variant="destructive" className="absolute top-3 left-3 shadow-md">
               -{discountPercent}%
             </Badge>
           )}
           {product.stock <= 5 && product.stock > 0 && (
-            <Badge variant="secondary" className="absolute top-3 right-3">
+            <Badge variant="secondary" className="absolute top-3 right-3 shadow-md">
               Còn {product.stock} xe
             </Badge>
           )}
           {product.stock === 0 && (
-            <Badge variant="outline" className="absolute top-3 right-3 bg-background">
+            <Badge variant="outline" className="absolute top-3 right-3 bg-background/90 shadow-md">
               Hết hàng
             </Badge>
           )}
@@ -48,55 +51,67 @@ export function ProductCard({ product }: ProductCardProps) {
       </Link>
 
       <CardContent className="p-4 space-y-3">
-        <div className="space-y-1">
-          <Link href={`/products/${product.id}`}>
-            <h3 className="font-semibold text-lg leading-tight hover:text-primary transition-colors line-clamp-1">
+        <div className="space-y-1.5">
+          <Link href={`/products/${product._id}`}>
+            <h3 className="font-semibold text-lg leading-tight hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
               {product.name}
             </h3>
           </Link>
-          <p className="text-sm text-muted-foreground line-clamp-2">{product.shortDescription}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">{product.shortDescription}</p>
         </div>
 
-        {/* Rating */}
-        <div className="flex items-center gap-1">
-          <div className="flex items-center">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`h-4 w-4 ${
-                  i < Math.floor(product.rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"
-                }`}
+        <div className="flex items-center justify-between">
+          {/* Rating */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Star
+                  key={`star-${i}`}
+                  className={`h-4 w-4 ${
+                    i < Math.floor(product.rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {product.rating > 0 ? product.rating.toFixed(1) : "0.0"} ({product.reviews})
+            </span>
+          </div>
+
+          {/* Colors */}
+          <div className="flex items-center gap-1.5">
+            {product.colors.slice(0, 4).map((color, index) => (
+              <div
+                key={`${color.name}-${index}`}
+                className="h-5 w-5 rounded-full border-2 border-border shadow-sm hover:scale-110 transition-transform"
+                style={{ backgroundColor: color.hex }}
+                title={color.name}
               />
             ))}
+            {product.colors.length > 4 && (
+              <span className="text-xs text-muted-foreground font-medium">+{product.colors.length - 4}</span>
+            )}
           </div>
-          <span className="text-sm text-muted-foreground">({product.reviews})</span>
-        </div>
-
-        {/* Colors */}
-        <div className="flex items-center gap-1.5">
-          {product.colors.slice(0, 4).map((color) => (
-            <div
-              key={color.name}
-              className="h-5 w-5 rounded-full border border-border shadow-sm"
-              style={{ backgroundColor: color.hex }}
-              title={color.name}
-            />
-          ))}
-          {product.colors.length > 4 && (
-            <span className="text-xs text-muted-foreground">+{product.colors.length - 4}</span>
-          )}
         </div>
 
         {/* Price */}
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between pt-2 border-t border-border/50">
           <div className="space-y-0.5">
-            <p className="text-lg font-bold text-primary">{formatCurrency(product.price)}</p>
-            {hasDiscount && (
-              <p className="text-sm text-muted-foreground line-through">{formatCurrency(product.originalPrice!)}</p>
+            <p className="text-xl font-bold text-primary">{formatCurrency(product.price)}</p>
+            {productHasDiscount && product.originalPrice && (
+              <p className="text-sm text-muted-foreground line-through">{formatCurrency(product.originalPrice)}</p>
             )}
           </div>
-          <Button size="icon" variant="outline" className="shrink-0 bg-transparent" disabled={product.stock === 0}>
-            <ShoppingCart className="h-4 w-4" />
+          <Button
+            size="icon"
+            variant="outline"
+            className="shrink-0 bg-transparent hover:bg-primary hover:text-primary-foreground transition-colors"
+            disabled={product.stock === 0}
+            asChild
+          >
+            <Link href={`/products/${product._id}`}>
+              <ShoppingCart className="h-4 w-4" />
+            </Link>
           </Button>
         </div>
       </CardContent>

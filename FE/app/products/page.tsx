@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Search, SlidersHorizontal, X } from "lucide-react"
 import { Header } from "@/components/header"
@@ -13,21 +13,66 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { products, categories, formatCurrency } from "@/lib/mock-data"
+import { productsApi, categoriesApi } from "@/lib/api"
+import { formatCurrency } from "@/lib/utils"
+import { logger } from "@/lib/logger"
+import type { Product, Category } from "@/lib/types"
 
 export default function ProductsPage() {
   const searchParams = useSearchParams()
   const categoryParam = searchParams.get("category")
 
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategories, setSelectedCategories] = useState<string[]>(categoryParam ? [categoryParam] : [])
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000000000])
   const [sortBy, setSortBy] = useState("featured")
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        const [productsResponse, categoriesResponse] = await Promise.all([
+          productsApi.getAll(),
+          categoriesApi.getAll(),
+        ])
+        setProducts(productsResponse.product)
+        setCategories(categoriesResponse.categories)
+      } catch (error) {
+        logger.error("Failed to fetch data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  useEffect(() => {
+    const fetchCategoryProducts = async () => {
+      if (categoryParam) {
+        try {
+          setIsLoading(true)
+          const response = await categoriesApi.getProductsByCategory(categoryParam)
+          setProducts(response.products)
+        } catch (error) {
+          logger.error("Failed to fetch category products:", error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    if (categoryParam) {
+      fetchCategoryProducts()
+    }
+  }, [categoryParam])
+
   const filteredProducts = useMemo(() => {
     let filtered = [...products]
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -36,15 +81,18 @@ export default function ProductsPage() {
       )
     }
 
-    // Category filter
     if (selectedCategories.length > 0) {
-      filtered = filtered.filter((product) => selectedCategories.includes(product.category))
+      filtered = filtered.filter((product) => {
+        const categoryId = typeof product.category === "string" ? product.category : product.category._id
+        const categorySlug = typeof product.category === "object" ? product.category.slug : ""
+        return selectedCategories.some(
+          (slug) => slug === categorySlug || categories.find((c) => c.slug === slug)?._id === categoryId,
+        )
+      })
     }
 
-    // Price filter
     filtered = filtered.filter((product) => product.price >= priceRange[0] && product.price <= priceRange[1])
 
-    // Sorting
     switch (sortBy) {
       case "price-asc":
         filtered.sort((a, b) => a.price - b.price)
@@ -56,12 +104,16 @@ export default function ProductsPage() {
         filtered.sort((a, b) => b.rating - a.rating)
         break
       case "newest":
-        filtered.sort((a, b) => Number.parseInt(b.id) - Number.parseInt(a.id))
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return dateB - dateA
+        })
         break
     }
 
     return filtered
-  }, [searchQuery, selectedCategories, priceRange, sortBy])
+  }, [products, searchQuery, selectedCategories, priceRange, sortBy, categories])
 
   const toggleCategory = (categorySlug: string) => {
     setSelectedCategories((prev) =>
@@ -79,23 +131,23 @@ export default function ProductsPage() {
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Categories */}
-      <div className="space-y-3">
-        <h3 className="font-semibold">Danh mục</h3>
-        <div className="space-y-2">
-          {categories.map((category) => (
-            <div key={category.id} className="flex items-center space-x-2">
-              <Checkbox
-                id={category.slug}
-                checked={selectedCategories.includes(category.slug)}
-                onCheckedChange={() => toggleCategory(category.slug)}
-              />
-              <Label htmlFor={category.slug} className="text-sm font-normal cursor-pointer">
-                {category.name} ({category.productCount})
-              </Label>
-            </div>
-          ))}
+        <div className="space-y-3">
+          <h3 className="font-semibold">Danh mục</h3>
+          <div className="space-y-2">
+            {categories.map((category) => (
+              <div key={category._id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={category.slug}
+                  checked={selectedCategories.includes(category.slug)}
+                  onCheckedChange={() => toggleCategory(category.slug)}
+                />
+                <Label htmlFor={category.slug} className="text-sm font-normal cursor-pointer">
+                  {category.name}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
       {/* Price Range */}
       <div className="space-y-3">
@@ -103,7 +155,11 @@ export default function ProductsPage() {
         <div className="space-y-4">
           <Slider
             value={priceRange}
-            onValueChange={(value) => setPriceRange(value as [number, number])}
+            onValueChange={(value) => {
+              if (Array.isArray(value) && value.length === 2) {
+                setPriceRange([value[0], value[1]])
+              }
+            }}
             min={0}
             max={5000000000}
             step={100000000}
@@ -206,10 +262,14 @@ export default function ProductsPage() {
               <p className="text-sm text-muted-foreground mb-4">Hiển thị {filteredProducts.length} sản phẩm</p>
 
               {/* Products Grid */}
-              {filteredProducts.length > 0 ? (
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <p className="text-lg text-muted-foreground">Đang tải...</p>
+                </div>
+              ) : filteredProducts.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard key={product._id} product={product} />
                   ))}
                 </div>
               ) : (

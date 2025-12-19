@@ -11,12 +11,21 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useCart } from "@/lib/cart-context"
-import { formatCurrency, discountCodes } from "@/lib/mock-data"
+import { useAuth } from "@/lib/auth-context"
+import { formatCurrency } from "@/lib/utils"
+import { getErrorMessage } from "@/lib/error-handler"
+import {
+  getProductId,
+  getProductName,
+  getProductStock,
+  getProductImage,
+} from "@/lib/product-helpers"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, total, clearCart } = useCart()
+  const { items, removeItem, updateQuantity, total, clearCart, isLoading } = useCart()
+  const { isAuthenticated } = useAuth()
   const [discountCode, setDiscountCode] = useState("")
   const [appliedDiscount, setAppliedDiscount] = useState<{
     code: string
@@ -25,40 +34,10 @@ export default function CartPage() {
   const { toast } = useToast()
 
   const applyDiscount = () => {
-    const code = discountCodes.find((c) => c.code.toLowerCase() === discountCode.toLowerCase() && c.isActive)
-
-    if (!code) {
-      toast({
-        title: "Mã giảm giá không hợp lệ",
-        description: "Vui lòng kiểm tra lại mã giảm giá",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (total < code.minOrder) {
-      toast({
-        title: "Không đủ điều kiện",
-        description: `Đơn hàng tối thiểu ${formatCurrency(code.minOrder)}`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    let discountAmount = 0
-    if (code.discountType === "percent") {
-      discountAmount = (total * code.discountValue) / 100
-      if (code.maxDiscount && discountAmount > code.maxDiscount) {
-        discountAmount = code.maxDiscount
-      }
-    } else {
-      discountAmount = code.discountValue
-    }
-
-    setAppliedDiscount({ code: code.code, amount: discountAmount })
+    setAppliedDiscount({ code: discountCode, amount: 0 })
     toast({
-      title: "Áp dụng mã giảm giá thành công",
-      description: `Bạn được giảm ${formatCurrency(discountAmount)}`,
+      title: "Mã giảm giá sẽ được áp dụng khi thanh toán",
+      description: "Mã giảm giá sẽ được kiểm tra và áp dụng khi bạn tiến hành thanh toán",
     })
   }
 
@@ -68,6 +47,33 @@ export default function CartPage() {
   }
 
   const finalTotal = total - (appliedDiscount?.amount || 0)
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-bold">Vui lòng đăng nhập</h1>
+            <p className="text-muted-foreground">Bạn cần đăng nhập để xem giỏ hàng</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">Đang tải...</div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (items.length === 0) {
     return (
@@ -101,73 +107,126 @@ export default function CartPage() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {items.map((item) => (
-                <Card key={`${item.product.id}-${item.selectedColor}`} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex gap-4">
-                      <div className="relative h-24 w-24 sm:h-32 sm:w-32 rounded-lg overflow-hidden bg-muted shrink-0">
-                        <Image
-                          src={item.product.images[0] || "/placeholder.svg"}
-                          alt={item.product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <Link
-                              href={`/products/${item.product.id}`}
-                              className="font-semibold hover:text-primary transition-colors line-clamp-1"
-                            >
-                              {item.product.name}
-                            </Link>
-                            <p className="text-sm text-muted-foreground">Màu: {item.selectedColor}</p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => removeItem(item.product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+              {items.map((item, index) => {
+                const productId = getProductId(item)
+                const productName = getProductName(item)
+                const productStock = getProductStock(item)
+                const productImage = getProductImage(item)
+                const itemKey = `${productId}-${item.color}-${index}`
 
-                        <div className="flex items-end justify-between">
-                          <div className="flex items-center border rounded-lg">
+                const handleRemove = async () => {
+                  try {
+                    await removeItem(productId, item.color)
+                  } catch (error) {
+                    toast({
+                      title: "Lỗi",
+                      description: getErrorMessage(error),
+                      variant: "destructive",
+                    })
+                  }
+                }
+
+                const handleDecreaseQuantity = async () => {
+                  try {
+                    await updateQuantity(productId, item.color, item.quantity - 1)
+                  } catch (error) {
+                    toast({
+                      title: "Lỗi",
+                      description: getErrorMessage(error),
+                      variant: "destructive",
+                    })
+                  }
+                }
+
+                const handleIncreaseQuantity = async () => {
+                  try {
+                    await updateQuantity(productId, item.color, Math.min(productStock, item.quantity + 1))
+                  } catch (error) {
+                    toast({
+                      title: "Lỗi",
+                      description: getErrorMessage(error),
+                      variant: "destructive",
+                    })
+                  }
+                }
+
+                return (
+                  <Card key={itemKey} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex gap-4">
+                        <div className="relative h-24 w-24 sm:h-32 sm:w-32 rounded-lg overflow-hidden bg-muted shrink-0">
+                          <Image src={productImage} alt={productName} fill className="object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <Link
+                                href={`/products/${productId}`}
+                                className="font-semibold hover:text-primary transition-colors line-clamp-1"
+                              >
+                                {productName}
+                              </Link>
+                              <p className="text-sm text-muted-foreground">Màu: {item.color}</p>
+                            </div>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-r-none"
-                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              onClick={handleRemove}
                             >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 rounded-l-none"
-                              onClick={() =>
-                                updateQuantity(item.product.id, Math.min(item.product.stock, item.quantity + 1))
-                              }
-                            >
-                              <Plus className="h-3 w-3" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          <p className="font-semibold text-primary">
-                            {formatCurrency(item.product.price * item.quantity)}
-                          </p>
+
+                          <div className="flex items-end justify-between">
+                            <div className="flex items-center border rounded-lg">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-r-none"
+                                onClick={handleDecreaseQuantity}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-l-none"
+                                onClick={handleIncreaseQuantity}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <p className="font-semibold text-primary">{formatCurrency(item.price * item.quantity)}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
 
               <div className="flex justify-between pt-4">
-                <Button variant="outline" className="bg-transparent" onClick={clearCart}>
+                <Button
+                  variant="outline"
+                  className="bg-transparent"
+                  onClick={async () => {
+                    try {
+                      await clearCart()
+                      toast({
+                        title: "Đã xóa giỏ hàng",
+                        description: "Tất cả sản phẩm đã được xóa khỏi giỏ hàng",
+                      })
+                    } catch (error) {
+                      toast({
+                        title: "Lỗi",
+                        description: getErrorMessage(error),
+                        variant: "destructive",
+                      })
+                    }
+                  }}
+                >
                   Xóa giỏ hàng
                 </Button>
                 <Link href="/products">

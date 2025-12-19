@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { use } from "react"
+import { useState, useEffect, use } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -11,40 +10,94 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { products, formatCurrency } from "@/lib/mock-data"
+import { productsApi } from "@/lib/api"
+import { formatCurrency, getProductImageUrl } from "@/lib/utils"
+import { getErrorMessage } from "@/lib/error-handler"
+import { hasDiscount, calculateDiscountPercent } from "@/lib/product-helpers"
+import type { Product } from "@/lib/types"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 interface ProductPageProps {
-  params: Promise<{ id: string }>
+  readonly params: Promise<{ id: string }>
 }
 
 export default function ProductPage({ params }: ProductPageProps) {
   const resolvedParams = use(params)
-  const product = products.find((p) => p.id === resolvedParams.id)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState(0)
+  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image: string } | null>(null)
+  const [quantity, setQuantity] = useState(1)
+  const { addItem } = useCart()
+  const { isAuthenticated } = useAuth()
+  const { toast } = useToast()
 
-  if (!product) {
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        setIsLoading(true)
+        const response = await productsApi.getById(resolvedParams.id)
+        setProduct(response.product)
+        if (response.product.colors.length > 0) {
+          setSelectedColor(response.product.colors[0])
+        }
+      } catch {
+        notFound()
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProduct()
+  }, [resolvedParams.id])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">Đang tải...</div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (!product || !selectedColor) {
     notFound()
   }
 
-  const [selectedImage, setSelectedImage] = useState(0)
-  const [selectedColor, setSelectedColor] = useState(product.colors[0])
-  const [quantity, setQuantity] = useState(1)
-  const { addItem } = useCart()
-  const { toast } = useToast()
-
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price
-  const discountPercent = hasDiscount
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
+  const productHasDiscount = hasDiscount(product)
+  const discountPercent = productHasDiscount && product.originalPrice
+    ? calculateDiscountPercent(product.originalPrice, product.price)
     : 0
 
-  const handleAddToCart = () => {
-    addItem(product, quantity, selectedColor.name)
-    toast({
-      title: "Đã thêm vào giỏ hàng",
-      description: `${quantity}x ${product.name} (${selectedColor.name})`,
-    })
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Vui lòng đăng nhập",
+        description: "Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await addItem(product, quantity, selectedColor.name)
+      toast({
+        title: "Đã thêm vào giỏ hàng",
+        description: `${quantity}x ${product.name} (${selectedColor.name})`,
+      })
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -68,13 +121,13 @@ export default function ProductPage({ params }: ProductPageProps) {
             <div className="space-y-4">
               <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
                 <Image
-                  src={product.images[selectedImage] || "/placeholder.svg"}
+                  src={getProductImageUrl(product.images[selectedImage] || "")}
                   alt={product.name}
                   fill
                   className="object-cover"
                   priority
                 />
-                {hasDiscount && (
+                {productHasDiscount && discountPercent > 0 && (
                   <Badge variant="destructive" className="absolute top-4 left-4 text-sm">
                     -{discountPercent}%
                   </Badge>
@@ -83,14 +136,16 @@ export default function ProductPage({ params }: ProductPageProps) {
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {product.images.map((image, index) => (
                   <button
-                    key={index}
+                    key={`image-${index}-${image}`}
                     onClick={() => setSelectedImage(index)}
-                    className={`relative aspect-[4/3] w-24 shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index ? "border-primary" : "border-transparent"
+                    className={`relative aspect-[4/3] w-24 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImage === index
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-transparent hover:border-primary/50"
                     }`}
                   >
                     <Image
-                      src={image || "/placeholder.svg"}
+                      src={getProductImageUrl(image || "")}
                       alt={`${product.name} ${index + 1}`}
                       fill
                       className="object-cover"
@@ -106,9 +161,9 @@ export default function ProductPage({ params }: ProductPageProps) {
                 <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
+                    {Array.from({ length: 5 }, (_, i) => (
                       <Star
-                        key={i}
+                        key={`star-${i}`}
                         className={`h-5 w-5 ${
                           i < Math.floor(product.rating)
                             ? "fill-yellow-400 text-yellow-400"
@@ -118,7 +173,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                     ))}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {product.rating} ({product.reviews} đánh giá)
+                    {product.rating > 0 ? product.rating.toFixed(1) : "0.0"} ({product.reviews} đánh giá)
                   </span>
                 </div>
               </div>
@@ -127,9 +182,9 @@ export default function ProductPage({ params }: ProductPageProps) {
               <div className="space-y-1">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-primary">{formatCurrency(product.price)}</span>
-                  {hasDiscount && (
+                  {productHasDiscount && product.originalPrice && (
                     <span className="text-lg text-muted-foreground line-through">
-                      {formatCurrency(product.originalPrice!)}
+                      {formatCurrency(product.originalPrice)}
                     </span>
                   )}
                 </div>
@@ -251,14 +306,18 @@ export default function ProductPage({ params }: ProductPageProps) {
                 <p className="text-muted-foreground leading-relaxed">{product.description}</p>
               </TabsContent>
               <TabsContent value="specs" className="pt-6">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {product.specs.map((spec, index) => (
-                    <div key={index} className="flex justify-between py-3 border-b">
-                      <span className="text-muted-foreground">{spec.label}</span>
-                      <span className="font-medium">{spec.value}</span>
-                    </div>
-                  ))}
-                </div>
+                {product.specs.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {product.specs.map((spec) => (
+                      <div key={`${spec.label}-${spec.value}`} className="flex justify-between py-3 border-b">
+                        <span className="text-muted-foreground">{spec.label}</span>
+                        <span className="font-medium">{spec.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Chưa có thông số kỹ thuật</p>
+                )}
               </TabsContent>
             </Tabs>
           </div>

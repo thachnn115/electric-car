@@ -1,77 +1,125 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import type { Product } from "./mock-data"
-
-export interface CartItem {
-  product: Product
-  quantity: number
-  selectedColor: string
-}
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
+import { cartApi } from "./api"
+import { handleApiError } from "./error-handler"
+import { logger } from "./logger"
+import type { CartItem, Product } from "./types"
+import { useAuth } from "./auth-context"
 
 interface CartContextType {
   items: CartItem[]
-  addItem: (product: Product, quantity: number, color: string) => void
-  removeItem: (productId: string) => void
-  updateQuantity: (productId: string, quantity: number) => void
-  clearCart: () => void
+  addItem: (product: Product, quantity: number, color: string) => Promise<void>
+  removeItem: (productId: string, color: string) => Promise<void>
+  updateQuantity: (productId: string, color: string, quantity: number) => Promise<void>
+  clearCart: () => Promise<void>
+  refreshCart: () => Promise<void>
   total: number
   itemCount: number
+  isLoading: boolean
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
+const AUTH_REQUIRED_MESSAGE = "Vui lòng đăng nhập"
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { isAuthenticated } = useAuth()
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      setItems(JSON.parse(savedCart))
-    }
-  }, [])
-
-  // Save cart to localStorage on change
-  useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(items))
-  }, [items])
-
-  const addItem = (product: Product, quantity: number, color: string) => {
-    setItems((prev) => {
-      const existingItem = prev.find((item) => item.product.id === product.id && item.selectedColor === color)
-
-      if (existingItem) {
-        return prev.map((item) =>
-          item.product.id === product.id && item.selectedColor === color
-            ? { ...item, quantity: item.quantity + quantity }
-            : item,
-        )
-      }
-
-      return [...prev, { product, quantity, selectedColor: color }]
-    })
-  }
-
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId))
-  }
-
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(productId)
+  const refreshCart = useCallback(async () => {
+    if (!isAuthenticated) {
+      setItems([])
+      setIsLoading(false)
       return
     }
 
-    setItems((prev) => prev.map((item) => (item.product.id === productId ? { ...item, quantity } : item)))
-  }
+    try {
+      setIsLoading(true)
+      const response = await cartApi.get()
+      setItems(response.cart.items || [])
+    } catch (error) {
+      logger.error("Failed to fetch cart:", error)
+      setItems([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isAuthenticated])
 
-  const clearCart = () => {
-    setItems([])
-  }
+  useEffect(() => {
+    refreshCart()
+  }, [refreshCart])
 
-  const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+  const addItem = useCallback(
+    async (product: Product, quantity: number, color: string) => {
+      if (!isAuthenticated) {
+        throw new Error(`${AUTH_REQUIRED_MESSAGE} để thêm sản phẩm vào giỏ hàng`)
+      }
+
+      try {
+        await cartApi.addItem(product._id, quantity, color)
+        await refreshCart()
+      } catch (error) {
+        throw handleApiError(error, "Không thể thêm sản phẩm vào giỏ hàng")
+      }
+    },
+    [isAuthenticated, refreshCart]
+  )
+
+  const removeItem = useCallback(
+    async (productId: string, color: string) => {
+      if (!isAuthenticated) {
+        throw new Error(AUTH_REQUIRED_MESSAGE)
+      }
+
+      try {
+        await cartApi.removeItem(productId, color)
+        await refreshCart()
+      } catch (error) {
+        throw handleApiError(error, "Không thể xóa sản phẩm")
+      }
+    },
+    [isAuthenticated, refreshCart]
+  )
+
+  const updateQuantity = useCallback(
+    async (productId: string, color: string, quantity: number) => {
+      if (!isAuthenticated) {
+        throw new Error(AUTH_REQUIRED_MESSAGE)
+      }
+
+      if (quantity <= 0) {
+        await removeItem(productId, color)
+        return
+      }
+
+      try {
+        await cartApi.updateItem(productId, color, quantity)
+        await refreshCart()
+      } catch (error) {
+        throw handleApiError(error, "Không thể cập nhật số lượng")
+      }
+    },
+    [isAuthenticated, refreshCart, removeItem]
+  )
+
+  const clearCart = useCallback(async () => {
+    if (!isAuthenticated) {
+      setItems([])
+      return
+    }
+
+    try {
+      await cartApi.clear()
+      await refreshCart()
+    } catch (error) {
+      logger.error("Failed to clear cart:", error)
+    }
+  }, [isAuthenticated, refreshCart])
+
+  const total = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items])
+  const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items])
 
   return (
     <CartContext.Provider
@@ -81,8 +129,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        refreshCart,
         total,
         itemCount,
+        isLoading,
       }}
     >
       {children}

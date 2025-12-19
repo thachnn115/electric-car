@@ -2,12 +2,24 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { ShoppingCart, Menu, X, Search, User, Zap } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ShoppingCart, Menu, X, Search, User, Zap, LogOut, Package, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useCart } from "@/lib/cart-context"
+import { useAuth } from "@/lib/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { getErrorMessage } from "@/lib/error-handler"
 
 const navigation = [
   { name: "Trang chủ", href: "/" },
@@ -18,8 +30,28 @@ const navigation = [
 ]
 
 export function Header() {
+  const router = useRouter()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { itemCount } = useCart()
+  const { isAuthenticated, user, logout, isAdmin } = useAuth()
+  const { toast } = useToast()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      toast({
+        title: "Đăng xuất thành công",
+        description: "Hẹn gặp lại bạn!",
+      })
+      router.push("/")
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -79,12 +111,62 @@ export function Header() {
               </Button>
             </Link>
 
-            {/* User/Admin */}
-            <Link href="/admin">
-              <Button variant="ghost" size="icon">
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+            {/* User Menu */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/orders" className="flex items-center">
+                      <Package className="mr-2 h-4 w-4" />
+                      Đơn hàng của tôi
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Cài đặt tài khoản
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="flex items-center">
+                          <User className="mr-2 h-4 w-4" />
+                          Quản trị viên
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Đăng xuất
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2">
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Đăng nhập</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/register">Đăng ký</Link>
+                </Button>
+              </div>
+            )}
 
             {/* Mobile Menu */}
             <Sheet>
@@ -112,6 +194,45 @@ export function Header() {
                       </Link>
                     ))}
                   </nav>
+                  {isAuthenticated ? (
+                    <div className="flex flex-col gap-2 pt-4 border-t">
+                      <Link
+                        href="/orders"
+                        className="px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors"
+                      >
+                        Đơn hàng của tôi
+                      </Link>
+                      <Link
+                        href="/profile"
+                        className="px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors"
+                      >
+                        Cài đặt tài khoản
+                      </Link>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          className="px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors"
+                        >
+                          Quản trị viên
+                        </Link>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="px-4 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors text-left text-destructive"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 pt-4 border-t">
+                      <Button variant="outline" asChild className="w-full">
+                        <Link href="/login">Đăng nhập</Link>
+                      </Button>
+                      <Button asChild className="w-full">
+                        <Link href="/register">Đăng ký</Link>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

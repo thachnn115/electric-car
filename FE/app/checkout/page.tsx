@@ -17,23 +17,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useCart } from "@/lib/cart-context"
-import { formatCurrency } from "@/lib/mock-data"
+import { useAuth } from "@/lib/auth-context"
+import { checkoutApi } from "@/lib/api"
+import { formatCurrency } from "@/lib/utils"
+import { getErrorMessage } from "@/lib/error-handler"
+import { getProductName, getProductImage } from "@/lib/product-helpers"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, total, clearCart } = useCart()
+  const { items, total, isLoading } = useCart()
+  const { user, isAuthenticated } = useAuth()
   const { toast } = useToast()
 
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    address: user?.address || "",
     note: "",
   })
-  const [paymentMethod, setPaymentMethod] = useState("vnpay")
+  const [paymentMethod, setPaymentMethod] = useState("VNPAY")
+  const [discountCode, setDiscountCode] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -43,6 +49,15 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!isAuthenticated) {
+      toast({
+        title: "Vui lòng đăng nhập",
+        description: "Bạn cần đăng nhập để thanh toán",
+        variant: "destructive",
+      })
+      return
+    }
 
     if (!formData.name || !formData.email || !formData.phone || !formData.address) {
       toast({
@@ -54,12 +69,58 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true)
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const response = await checkoutApi.createOrder({
+        discountCode: discountCode || undefined,
+        paymentMethod: paymentMethod === "cod" ? "COD" : "VNPAY",
+        userPhone: formData.phone,
+        shippingAddress: formData.address,
+      })
 
-    // Clear cart and redirect to success page
-    clearCart()
-    router.push("/checkout/success")
+      if (paymentMethod === "cod") {
+        router.push("/checkout/success")
+      } else {
+        if (response.paymentUrl) {
+          window.location.href = response.paymentUrl
+        } else {
+          throw new Error("Không nhận được URL thanh toán")
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-bold">Vui lòng đăng nhập</h1>
+            <p className="text-muted-foreground">Bạn cần đăng nhập để thanh toán</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">Đang tải...</div>
+        </main>
+        <Footer />
+      </div>
+    )
   }
 
   if (items.length === 0) {
@@ -179,7 +240,7 @@ export default function CheckoutPage() {
                   <CardContent>
                     <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                       <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <RadioGroupItem value="vnpay" id="vnpay" />
+                        <RadioGroupItem value="VNPAY" id="vnpay" />
                         <Label htmlFor="vnpay" className="flex-1 flex items-center gap-3 cursor-pointer">
                           <div className="h-10 w-16 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-sm">
                             VNPAY
@@ -191,7 +252,7 @@ export default function CheckoutPage() {
                         </Label>
                       </div>
                       <div className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <RadioGroupItem value="cod" id="cod" />
+                        <RadioGroupItem value="COD" id="cod" />
                         <Label htmlFor="cod" className="flex-1 flex items-center gap-3 cursor-pointer">
                           <div className="h-10 w-16 bg-muted rounded flex items-center justify-center">
                             <CreditCard className="h-5 w-5" />
@@ -216,27 +277,39 @@ export default function CheckoutPage() {
                   <CardContent className="space-y-4">
                     {/* Items */}
                     <div className="space-y-3">
-                      {items.map((item) => (
-                        <div key={`${item.product.id}-${item.selectedColor}`} className="flex gap-3">
-                          <div className="relative h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
-                            <Image
-                              src={item.product.images[0] || "/placeholder.svg"}
-                              alt={item.product.name}
-                              fill
-                              className="object-cover"
-                            />
+                      {items.map((item, index) => {
+                        const productId = typeof item.product === "string" ? item.product : item.product._id
+                        const productName = getProductName(item)
+                        const productImage = getProductImage(item)
+                        const itemKey = `${productId}-${item.color}-${index}`
+
+                        return (
+                          <div key={itemKey} className="flex gap-3">
+                            <div className="relative h-16 w-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                              <Image src={productImage} alt={productName} fill className="object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm line-clamp-1">{productName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {item.color} x {item.quantity}
+                              </p>
+                              <p className="text-sm font-medium text-primary">
+                                {formatCurrency(item.price * item.quantity)}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm line-clamp-1">{item.product.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.selectedColor} x {item.quantity}
-                            </p>
-                            <p className="text-sm font-medium text-primary">
-                              {formatCurrency(item.product.price * item.quantity)}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
+                    </div>
+
+                    {/* Discount Code */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Mã giảm giá</label>
+                      <Input
+                        placeholder="Nhập mã giảm giá"
+                        value={discountCode}
+                        onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                      />
                     </div>
 
                     <Separator />
