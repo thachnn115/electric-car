@@ -1,25 +1,24 @@
 const Product = require("../models/productModel")
 const CustomError = require("../errors")
 const { StatusCodes } = require("http-status-codes")
-const fs = require("fs")
-const path = require("path")
+const { uploadBuffer } = require("../utils/cloudinary")
 
 const normalizeToArray = (value) => (Array.isArray(value) ? value : [value])
-const uploadsDir = path.join(__dirname, "../public/uploads")
 
-const ensureUploadsDir = () => {
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true })
+const CLOUDINARY_BASE_FOLDER = process.env.CLOUDINARY_PRODUCT_FOLDER || "electric-car/products"
+const uploadImageToCloudinary = async (file, folder = CLOUDINARY_BASE_FOLDER) => {
+  if (!file || !file.mimetype || !file.mimetype.startsWith("image")) {
+    throw new CustomError.BadRequestError("Please upload image file")
   }
-}
 
-const saveLocalFile = async (file, prefix = "file") => {
-  ensureUploadsDir()
-  const sanitizedName = file.name.replace(/\s+/g, "-")
-  const filename = `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e6)}-${sanitizedName}`
-  const filePath = path.join(uploadsDir, filename)
-  await file.mv(filePath)
-  return `/uploads/${filename}`
+  const result = await uploadBuffer(file.data, {
+    folder,
+    resource_type: "image",
+    use_filename: true,
+    unique_filename: true,
+  })
+
+  return result.secure_url
 }
 
 // ** ===================  CREATE PRODUCT  ===================
@@ -34,7 +33,9 @@ const createProduct = async (req, res) => {
   // Upload gallery images locally if provided via form-data under key "gallery"
   if (req.files && req.files.gallery) {
     const galleryFiles = normalizeToArray(req.files.gallery)
-    const uploads = await Promise.all(galleryFiles.map((file) => saveLocalFile(file, "gallery")))
+    const uploads = await Promise.all(
+      galleryFiles.map((file) => uploadImageToCloudinary(file, `${CLOUDINARY_BASE_FOLDER}/gallery`))
+    )
     body.images = uploads
   }
 
@@ -47,7 +48,9 @@ const createProduct = async (req, res) => {
     if (colorFiles.length !== body.colors.length) {
       throw new CustomError.BadRequestError("colorImages count must match colors length")
     }
-    const uploads = await Promise.all(colorFiles.map((file) => saveLocalFile(file, "color")))
+    const uploads = await Promise.all(
+      colorFiles.map((file) => uploadImageToCloudinary(file, `${CLOUDINARY_BASE_FOLDER}/colors`))
+    )
     body.colors = body.colors.map((color, idx) => ({
       ...color,
       image: uploads[idx],
@@ -174,11 +177,8 @@ const uploadImage = async (req, res) => {
     throw new CustomError.BadRequestError("No File Uploaded")
   }
   const productImage = req.files.image
-  if (!productImage.mimetype.startsWith("image")) {
-    throw new CustomError.BadRequestError("Please upload image file")
-  }
 
-  const imagePath = await saveLocalFile(productImage, "single")
+  const imagePath = await uploadImageToCloudinary(productImage, `${CLOUDINARY_BASE_FOLDER}/single`)
 
   res.status(StatusCodes.OK).json({
     image: imagePath,
