@@ -7,8 +7,6 @@ public/uploads
 .next
 **/.next/
 **/.next
-FE/.next/
-FE/.next
 .env.local
 .env.development.local
 .env.production.local
@@ -21,4 +19,3 @@ FE/.next
 .env.test.development.local
 .env.test.production.local
 .env.test.development.local
-

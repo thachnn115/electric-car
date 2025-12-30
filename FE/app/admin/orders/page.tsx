@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, MoreHorizontal, Eye, Trash2, Package, Truck, CheckCircle, XCircle, Clock, Loader2, Plus } from "lucide-react"
+import { Search, MoreHorizontal, Eye, Trash2, Package, Truck, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,13 +22,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Label } from "@/components/ui/label"
-import { ordersApi, productsApi, usersApi, discountsApi } from "@/lib/api"
-import type { Order, Product, User, Discount } from "@/lib/types"
-import { formatCurrency, getStatusLabel, getPaymentStatusLabel } from "@/lib/utils"
-import { formatDate } from "@/lib/date-helpers"
+import { ordersApi } from "@/lib/api"
+import { formatCurrency, getStatusLabel, getPaymentStatusLabel, getProductImageUrl } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
+import type { Order } from "@/lib/types"
 import { getErrorMessage } from "@/lib/error-handler"
 import { getProductName, getProductImage } from "@/lib/product-helpers"
 
@@ -56,30 +54,12 @@ const statusIcons: Record<string, React.ComponentType<{ className?: string }>> =
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [discounts, setDiscounts] = useState<Discount[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [orderForm, setOrderForm] = useState({
-    userId: "",
-    userName: "",
-    userEmail: "",
-    userPhone: "",
-    shippingAddress: "",
-    discountCode: "",
-    status: "confirmed" as Order["status"],
-    paymentStatus: "paid" as Order["paymentStatus"],
-    paymentMethod: "OFFLINE",
-    items: [] as Array<{ productId: string; quantity: number; color: string }>,
-  })
-  const [newItem, setNewItem] = useState({ productId: "", quantity: 1, color: "" })
   const { toast } = useToast()
 
   const fetchOrders = useCallback(async () => {
@@ -98,51 +78,9 @@ export default function AdminOrdersPage() {
     }
   }, [toast])
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      const response = await productsApi.getAllAdmin()
-      setProducts(response.products)
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
-  const fetchUsers = useCallback(async () => {
-    try {
-      const response = await usersApi.getAll()
-      setUsers(response.users)
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
-  const fetchDiscounts = useCallback(async () => {
-    try {
-      const response = await discountsApi.getAll()
-      setDiscounts(response.discounts.filter((d) => d.isActive))
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
   useEffect(() => {
     void fetchOrders()
-    void fetchProducts()
-    void fetchUsers()
-    void fetchDiscounts()
-  }, [fetchOrders, fetchProducts, fetchUsers, fetchDiscounts])
+  }, [fetchOrders])
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -196,92 +134,6 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const openCreateDialog = () => {
-    setOrderForm({
-      userId: "",
-      userName: "",
-      userEmail: "",
-      userPhone: "",
-      shippingAddress: "",
-      discountCode: "",
-      status: "confirmed",
-      paymentStatus: "paid",
-      paymentMethod: "OFFLINE",
-      items: [],
-    })
-    setNewItem({ productId: "", quantity: 1, color: "" })
-    setIsCreateDialogOpen(true)
-  }
-
-  const addItemToOrder = () => {
-    if (!newItem.productId || !newItem.color) {
-      toast({
-        title: "Vui lòng chọn sản phẩm và màu sắc",
-        variant: "destructive",
-      })
-      return
-    }
-    setOrderForm((prev) => ({
-      ...prev,
-      items: [...prev.items, { ...newItem }],
-    }))
-    setNewItem({ productId: "", quantity: 1, color: "" })
-  }
-
-  const removeItemFromOrder = (index: number) => {
-    setOrderForm((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
-    }))
-  }
-
-  const handleCreateOrder = async () => {
-    if (!orderForm.userName || !orderForm.userEmail || !orderForm.shippingAddress) {
-      toast({
-        title: "Vui lòng điền đầy đủ thông tin khách hàng",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (orderForm.items.length === 0) {
-      toast({
-        title: "Vui lòng thêm ít nhất một sản phẩm",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      setIsCreating(true)
-      await ordersApi.createOfflineAdmin({
-        items: orderForm.items,
-        discountCode: orderForm.discountCode || undefined,
-        userId: orderForm.userId || undefined,
-        userName: orderForm.userName,
-        userEmail: orderForm.userEmail,
-        userPhone: orderForm.userPhone || undefined,
-        shippingAddress: orderForm.shippingAddress,
-        paymentStatus: orderForm.paymentStatus,
-        status: orderForm.status,
-        paymentMethod: orderForm.paymentMethod,
-      })
-      toast({ title: "Tạo đơn hàng thành công" })
-      setIsCreateDialogOpen(false)
-      void fetchOrders()
-    } catch (error) {
-      toast({
-        title: "Lỗi",
-        description: getErrorMessage(error),
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  const selectedProduct = products.find((p) => p._id === newItem.productId)
-
   const orderCounts = {
     all: orders.length,
     pending: orders.filter((o) => o.status === "pending").length,
@@ -296,9 +148,8 @@ export default function AdminOrdersPage() {
       <AdminHeader title="Quản lý đơn hàng" description={`${orders.length} đơn hàng`} />
 
       <main className="p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="flex flex-col gap-4 flex-1">
-            <Tabs value={filterStatus} onValueChange={setFilterStatus}>
+        <div className="flex flex-col gap-4">
+          <Tabs value={filterStatus} onValueChange={setFilterStatus}>
             <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="all" className="gap-2">
                 Tất cả <Badge variant="secondary">{orderCounts.all}</Badge>
@@ -331,11 +182,6 @@ export default function AdminOrdersPage() {
               className="pl-9"
             />
           </div>
-        </div>
-          <Button onClick={openCreateDialog} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Tạo đơn hàng offline
-          </Button>
         </div>
 
         <Card>
@@ -372,16 +218,13 @@ export default function AdminOrdersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {order.orderItems.slice(0, 2).map((item, index) => {
-                              const productId = typeof item.product === "string" ? item.product : item.product._id
-                              return (
-                                <Badge key={`${order._id}-${productId}-${index}-${item.color}`} variant="outline" className="text-xs">
-                                  {getProductName(item).length > 15
-                                    ? getProductName(item).substring(0, 15) + "..."
-                                    : getProductName(item)}
-                                </Badge>
-                              )
-                            })}
+                            {order.orderItems.slice(0, 2).map((item, index) => (
+                              <Badge key={`${item.product}-${index}`} variant="outline" className="text-xs">
+                                {getProductName(item).length > 15
+                                  ? getProductName(item).substring(0, 15) + "..."
+                                  : getProductName(item)}
+                              </Badge>
+                            ))}
                             {order.orderItems.length > 2 && (
                               <Badge variant="outline" className="text-xs">
                                 +{order.orderItems.length - 2}
@@ -392,7 +235,7 @@ export default function AdminOrdersPage() {
                         <TableCell>
                           <Select
                             value={order.status}
-                            onValueChange={(value) => updateOrderStatus(order._id, value as Order["status"])}
+                            onValueChange={(value: string) => updateOrderStatus(order._id, value as Order["status"])}
                           >
                             <SelectTrigger className="w-36 h-8">
                               <div className="flex items-center gap-2">
@@ -416,7 +259,7 @@ export default function AdminOrdersPage() {
                         </TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(order.finalTotal)}</TableCell>
                         <TableCell className="text-muted-foreground">
-                          {formatDate(order.createdAt)}
+                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString("vi-VN") : "-"}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -456,7 +299,7 @@ export default function AdminOrdersPage() {
           <DialogHeader>
             <DialogTitle>Chi tiết đơn hàng {selectedOrder?._id.slice(-8).toUpperCase()}</DialogTitle>
             <DialogDescription>
-              Ngày đặt: {formatDate(selectedOrder?.createdAt)}
+              Ngày đặt: {selectedOrder?.createdAt ? new Date(selectedOrder.createdAt).toLocaleDateString("vi-VN") : "-"}
             </DialogDescription>
           </DialogHeader>
 
@@ -493,10 +336,8 @@ export default function AdminOrdersPage() {
               <div>
                 <h4 className="font-medium mb-3">Sản phẩm</h4>
                 <div className="space-y-3">
-                  {selectedOrder.orderItems.map((item, index) => {
-                    const productId = typeof item.product === "string" ? item.product : item.product._id
-                    return (
-                      <div key={`${selectedOrder._id}-${productId}-${index}-${item.color}`} className="flex items-center gap-3">
+                  {selectedOrder.orderItems.map((item, index) => (
+                    <div key={`${item.product}-${index}`} className="flex items-center gap-3">
                       <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
                         <img
                           src={getProductImage(item)}
@@ -512,8 +353,7 @@ export default function AdminOrdersPage() {
                       </div>
                       <p className="font-medium shrink-0">{formatCurrency(item.price * item.quantity)}</p>
                     </div>
-                    )
-                  })}
+                  ))}
                 </div>
               </div>
 
@@ -573,239 +413,6 @@ export default function AdminOrdersPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Xóa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tạo đơn hàng offline</DialogTitle>
-            <DialogDescription>Tạo đơn hàng trực tiếp cho khách hàng</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 py-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="user-select">Chọn người dùng (tùy chọn)</Label>
-                <Select
-                  value={orderForm.userId}
-                  onValueChange={(value) => {
-                    const user = users.find((u) => u._id === value)
-                    setOrderForm((prev) => ({
-                      ...prev,
-                      userId: value,
-                      userName: user?.name || prev.userName,
-                      userEmail: user?.email || prev.userEmail,
-                      userPhone: user?.phone || prev.userPhone,
-                      shippingAddress: user?.address || prev.shippingAddress,
-                    }))
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn người dùng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Không chọn</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user._id || user.userId} value={user._id || user.userId || ""}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="discount-code">Mã giảm giá (tùy chọn)</Label>
-                <Select value={orderForm.discountCode} onValueChange={(value) => setOrderForm((prev) => ({ ...prev, discountCode: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn mã giảm giá" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Không sử dụng</SelectItem>
-                    {discounts.map((discount) => (
-                      <SelectItem key={discount._id} value={discount.code}>
-                        {discount.code} ({discount.discountType === "percent" ? `${discount.discountValue}%` : formatCurrency(discount.discountValue)})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="user-name">Tên khách hàng *</Label>
-                <Input
-                  id="user-name"
-                  value={orderForm.userName}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, userName: e.target.value }))}
-                  placeholder="Nhập tên khách hàng"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="user-email">Email *</Label>
-                <Input
-                  id="user-email"
-                  type="email"
-                  value={orderForm.userEmail}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, userEmail: e.target.value }))}
-                  placeholder="Nhập email"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="user-phone">Số điện thoại</Label>
-                <Input
-                  id="user-phone"
-                  type="tel"
-                  value={orderForm.userPhone}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, userPhone: e.target.value }))}
-                  placeholder="Nhập số điện thoại"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="shipping-address">Địa chỉ giao hàng *</Label>
-                <Input
-                  id="shipping-address"
-                  value={orderForm.shippingAddress}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, shippingAddress: e.target.value }))}
-                  placeholder="Nhập địa chỉ giao hàng"
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <Label className="mb-3 block">Sản phẩm</Label>
-              <div className="space-y-3">
-                {orderForm.items.map((item, index) => {
-                  const product = products.find((p) => p._id === item.productId)
-                  return (
-                    <div key={`order-item-${item.productId}-${item.color}-${index}`} className="flex items-center gap-3 p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">{product?.name || "Sản phẩm không tồn tại"}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Màu: {item.color} | Số lượng: {item.quantity}
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => removeItemFromOrder(index)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )
-                })}
-
-                <div className="grid gap-3 p-3 border rounded-lg">
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="grid gap-2">
-                      <Label>Sản phẩm</Label>
-                      <Select value={newItem.productId} onValueChange={(value) => setNewItem((prev) => ({ ...prev, productId: value, color: "" }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn sản phẩm" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product._id} value={product._id}>
-                              {product.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {selectedProduct && (
-                      <div className="grid gap-2">
-                        <Label>Màu sắc</Label>
-                        <Select value={newItem.color} onValueChange={(value) => setNewItem((prev) => ({ ...prev, color: value }))}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn màu" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {selectedProduct.colors.map((color) => (
-                              <SelectItem key={color.name} value={color.name}>
-                                {color.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    <div className="grid gap-2">
-                      <Label>Số lượng</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={selectedProduct?.stock || 1}
-                        value={newItem.quantity}
-                        onChange={(e) => setNewItem((prev) => ({ ...prev, quantity: Number(e.target.value) }))}
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={addItemToOrder} disabled={!newItem.productId || !newItem.color} className="w-full">
-                    Thêm sản phẩm
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="grid gap-2">
-                <Label htmlFor="status">Trạng thái</Label>
-                <Select
-                  value={orderForm.status}
-                  onValueChange={(value) => setOrderForm((prev) => ({ ...prev, status: value as Order["status"] }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Chờ xác nhận</SelectItem>
-                    <SelectItem value="confirmed">Đã xác nhận</SelectItem>
-                    <SelectItem value="shipping">Đang giao</SelectItem>
-                    <SelectItem value="delivered">Đã giao</SelectItem>
-                    <SelectItem value="cancelled">Đã hủy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="payment-status">Trạng thái thanh toán</Label>
-                <Select
-                  value={orderForm.paymentStatus}
-                  onValueChange={(value) => setOrderForm((prev) => ({ ...prev, paymentStatus: value as Order["paymentStatus"] }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Chờ thanh toán</SelectItem>
-                    <SelectItem value="paid">Đã thanh toán</SelectItem>
-                    <SelectItem value="failed">Thất bại</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="payment-method">Phương thức thanh toán</Label>
-                <Input
-                  id="payment-method"
-                  value={orderForm.paymentMethod}
-                  onChange={(e) => setOrderForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
-                  placeholder="VD: OFFLINE, TIỀN MẶT"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={handleCreateOrder} disabled={isCreating}>
-              {isCreating ? "Đang tạo..." : "Tạo đơn hàng"}
             </Button>
           </DialogFooter>
         </DialogContent>
