@@ -45,7 +45,13 @@ async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise
 }
 
 export const productsApi = {
-  getAll: (): Promise<ProductsResponse> => fetchApi<ProductsResponse>("/api/v1/products"),
+  getAll: (params?: { category?: string }): Promise<ProductsResponse> => {
+    const queryParams = new URLSearchParams()
+    if (params?.category) queryParams.append("category", params.category)
+    const queryString = queryParams.toString()
+    const endpoint = queryString ? `/api/v1/products?${queryString}` : "/api/v1/products"
+    return fetchApi<ProductsResponse>(endpoint)
+  },
   
   getById: (id: string): Promise<{ product: Product }> =>
     fetchApi<{ product: Product }>(`/api/v1/products/${id}`),
@@ -406,6 +412,17 @@ export const discountsApi = {
     }),
 }
 
-
-
+export const contactApi = {
+  sendMessage: (data: {
+    name: string
+    email: string
+    phone?: string
+    subject?: string
+    message: string
+  }): Promise<{ msg: string }> =>
+    fetchApi<{ msg: string }>("/api/v1/contact", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+}
 

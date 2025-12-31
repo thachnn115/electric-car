@@ -184,7 +184,7 @@ export const products: Product[] = [
     description:
       "Hyundai Ioniq 5 là mẫu crossover điện với thiết kế retro-futuristic độc đáo. Xe sử dụng nền tảng E-GMP mới, hỗ trợ sạc nhanh 800V và có không gian nội thất rộng rãi như một phòng khách di động.",
     shortDescription: "Crossover điện với thiết kế retro-futuristic độc đáo",
-    images: ["/hyundai-ioniq-5-retro-futuristic-gray.jpg", "/hyundai-ioniq-5-spacious-interior.jpg", "/placeholder.svg?height=600&width=800"],
+    images: ["/hyundai-ioniq-5-retro-futuristic-gray.jpg", "/hyundai-ioniq-5-spacious-interior.jpg", "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg"],
     colors: [
       { name: "Xám Gravity", hex: "#6b7280" },
       { name: "Trắng Atlas", hex: "#F8F8F8" },
@@ -211,9 +211,9 @@ export const products: Product[] = [
       "BYD Atto 3 là mẫu SUV điện cỡ B+ đến từ Trung Quốc với công nghệ pin Blade tiên tiến. Xe có thiết kế trẻ trung, nội thất hiện đại và giá cả cạnh tranh.",
     shortDescription: "SUV điện giá tốt với công nghệ pin Blade tiên tiến",
     images: [
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
     ],
     colors: [
       { name: "Xanh Forest", hex: "#166534" },
@@ -241,9 +241,9 @@ export const products: Product[] = [
       "Mercedes EQS là mẫu sedan điện hạng sang đầu bảng với nội thất Hyperscreen ấn tượng. Xe có tầm hoạt động lên đến 770km, thiết kế khí động học xuất sắc và công nghệ tiên tiến nhất của Mercedes.",
     shortDescription: "Sedan điện hạng sang đầu bảng với nội thất Hyperscreen",
     images: [
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
     ],
     colors: [
       { name: "Đen Obsidian", hex: "#0f0f0f" },
@@ -271,9 +271,9 @@ export const products: Product[] = [
       "Porsche Taycan là mẫu xe thể thao điện đầu tiên của Porsche với hiệu suất vượt trội và khả năng xử lý đặc trưng của thương hiệu. Xe có hệ thống sạc 800V và có thể tăng tốc từ 0-100 km/h chỉ trong 2.8 giây.",
     shortDescription: "Xe thể thao điện với hiệu suất và khả năng xử lý đỉnh cao",
     images: [
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
     ],
     colors: [
       { name: "Đỏ Carmine", hex: "#9f1239" },
@@ -301,9 +301,9 @@ export const products: Product[] = [
       "Kia EV6 là mẫu crossover điện thể thao với thiết kế táo bạo và công nghệ tiên tiến. Xe sử dụng nền tảng E-GMP, hỗ trợ sạc nhanh 800V và có khả năng Vehicle-to-Load (V2L) độc đáo.",
     shortDescription: "Crossover điện thể thao với thiết kế táo bạo",
     images: [
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
-      "/placeholder.svg?height=600&width=800",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
+      "https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg",
     ],
     colors: [
       { name: "Bạc", hex: "#A8A8A8" },

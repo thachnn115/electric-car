@@ -66,7 +66,7 @@ export function HeroSection() {
           <div className="relative">
             <div className="aspect-[4/3] relative rounded-2xl overflow-hidden shadow-2xl">
               <Image
-                src="/placeholder.svg?height=600&width=800"
+                src="https://static-cms-prod.vinfastauto.com/hinh-anh-xe-vinfast-dep-thumb_1650707860.jpeg"
                 alt="Electric Car Showroom"
                 fill
                 className="object-cover"

@@ -28,7 +28,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const { isAuthenticated } = useAuth()
 
-  const refreshCart = useCallback(async () => {
+  const refreshCart = useCallback(async (showLoading = true) => {
     if (!isAuthenticated) {
       setItems([])
       setIsLoading(false)
@@ -36,14 +36,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      setIsLoading(true)
+      if (showLoading) {
+        setIsLoading(true)
+      }
       const response = await cartApi.get()
       setItems(response.cart.items || [])
     } catch (error) {
       logger.error("Failed to fetch cart:", error)
       setItems([])
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }, [isAuthenticated])
 
@@ -58,13 +62,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        await cartApi.addItem(product._id, quantity, color)
-        await refreshCart()
+        const response = await cartApi.addItem(product._id, quantity, color)
+        // Update with server response to ensure consistency
+        if (response.cart?.items) {
+          setItems(response.cart.items)
+        }
       } catch (error) {
         throw handleApiError(error, "Không thể thêm sản phẩm vào giỏ hàng")
       }
     },
-    [isAuthenticated, refreshCart]
+    [isAuthenticated]
   )
 
   const removeItem = useCallback(
@@ -73,14 +80,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw new Error(AUTH_REQUIRED_MESSAGE)
       }
 
+      // Optimistic update
+      setItems((prevItems) =>
+        prevItems.filter((item) => {
+          const itemProductId = typeof item.product === "string" ? item.product : item.product._id
+          return !(itemProductId === productId && item.color === color)
+        })
+      )
+
       try {
-        await cartApi.removeItem(productId, color)
-        await refreshCart()
+        const response = await cartApi.removeItem(productId, color)
+        // Update with server response to ensure consistency
+        if (response.cart?.items) {
+          setItems(response.cart.items)
+        }
       } catch (error) {
+        // Revert on error by refreshing from server
+        try {
+          const response = await cartApi.get()
+          setItems(response.cart.items || [])
+        } catch {
+          // If refresh fails, keep optimistic update
+        }
         throw handleApiError(error, "Không thể xóa sản phẩm")
       }
     },
-    [isAuthenticated, refreshCart]
+    [isAuthenticated]
   )
 
   const updateQuantity = useCallback(
@@ -94,14 +119,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      // Optimistic update
+      setItems((prevItems) =>
+        prevItems.map((item) => {
+          const itemProductId = typeof item.product === "string" ? item.product : item.product._id
+          if (itemProductId === productId && item.color === color) {
+            return { ...item, quantity }
+          }
+          return item
+        })
+      )
+
       try {
-        await cartApi.updateItem(productId, color, quantity)
-        await refreshCart()
+        const response = await cartApi.updateItem(productId, color, quantity)
+        // Update with server response to ensure consistency
+        if (response.cart?.items) {
+          setItems(response.cart.items)
+        }
       } catch (error) {
+        // Revert on error by refreshing from server
+        try {
+          const response = await cartApi.get()
+          setItems(response.cart.items || [])
+        } catch {
+          // If refresh fails, keep optimistic update
+        }
         throw handleApiError(error, "Không thể cập nhật số lượng")
       }
     },
-    [isAuthenticated, refreshCart, removeItem]
+    [isAuthenticated, removeItem]
   )
 
   const clearCart = useCallback(async () => {

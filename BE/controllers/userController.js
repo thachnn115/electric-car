@@ -38,24 +38,100 @@ const getSingleUser = async (req, res) => {
 
 // Show current user
 const showCurrentUser = async (req, res) => {
-  res.status(StatusCodes.OK).json({ user: req.user })
+  // Fetch full user data from database to include all fields
+  const user = await User.findOne({ _id: req.user.userId }).select("-password")
+  if (!user) {
+    throw new CustomError.NotFoundError("User not found")
+  }
+  res.status(StatusCodes.OK).json({ user })
 }
 
 // Update user (self)
 const updateUser = async (req, res) => {
   const allowedFields = ["name", "email", "phone", "address", "avatar", "gender", "dateOfBirth"]
   const updates = {}
+  
+  // Process allowed fields
   for (const key of allowedFields) {
-    if (req.body[key] !== undefined) updates[key] = req.body[key]
+    if (req.body[key] !== undefined) {
+      updates[key] = req.body[key]
+    }
   }
 
   if (Object.keys(updates).length === 0) {
-    throw new CustomError.BadRequestError("Please provide value")
+    throw new CustomError.BadRequestError("Please provide at least one field to update")
   }
 
+  // Sanitize and validate updates
+  if (updates.name !== undefined) {
+    updates.name = updates.name.trim()
+    if (!updates.name || updates.name.length < 3) {
+      throw new CustomError.BadRequestError("Name must be at least 3 characters")
+    }
+  }
+
+  if (updates.email !== undefined) {
+    updates.email = updates.email.trim().toLowerCase()
+    if (!updates.email || !updates.email.includes("@")) {
+      throw new CustomError.BadRequestError("Please provide a valid email")
+    }
+  }
+
+  // Handle optional fields - allow empty string to clear
+  if (updates.phone !== undefined) {
+    updates.phone = updates.phone ? updates.phone.trim() : ""
+  }
+  if (updates.address !== undefined) {
+    updates.address = updates.address ? updates.address.trim() : ""
+  }
+  if (updates.avatar !== undefined) {
+    updates.avatar = updates.avatar || ""
+  }
+  if (updates.gender !== undefined) {
+    // Allow empty string or valid enum values
+    if (updates.gender !== "" && !["male", "female", "other"].includes(updates.gender)) {
+      throw new CustomError.BadRequestError("Gender must be one of: male, female, other")
+    }
+    updates.gender = updates.gender || ""
+  }
+  if (updates.dateOfBirth !== undefined) {
+    // Empty string means clear the field (set to undefined)
+    if (updates.dateOfBirth === "" || updates.dateOfBirth === null) {
+      updates.dateOfBirth = undefined
+    } else {
+      // Validate date format
+      const date = new Date(updates.dateOfBirth)
+      if (Number.isNaN(date.getTime())) {
+        throw new CustomError.BadRequestError("Please provide a valid date of birth")
+      }
+      // Check if date is in the future
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      if (date > today) {
+        throw new CustomError.BadRequestError("Date of birth cannot be in the future")
+      }
+    }
+  }
+
+  // Get current user
   const user = await User.findOne({ _id: req.user.userId })
+  if (!user) {
+    throw new CustomError.NotFoundError("User not found")
+  }
+
+  // Check if email is being changed and if new email already exists
+  if (updates.email && updates.email !== user.email) {
+    const emailExists = await User.findOne({ email: updates.email })
+    if (emailExists) {
+      throw new CustomError.BadRequestError("Email already exists")
+    }
+  }
+
+  // Apply updates
   Object.assign(user, updates)
   await user.save()
+
+  // Update token and cookie with new user data
   const tokenUser = createTokenUser(user)
   attachCookiesToResponse({ res, user: tokenUser })
   res.status(StatusCodes.OK).json({ user: tokenUser })

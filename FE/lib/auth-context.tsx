@@ -20,6 +20,7 @@ interface AuthContextType {
     address?: string
   }) => Promise<void>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
   isAuthenticated: boolean
   isAdmin: boolean
 }
@@ -100,6 +101,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await usersApi.getCurrentUser()
+      setUser(response.user)
+      saveUser(response.user)
+    } catch (error) {
+      logger.error("Failed to refresh user:", error)
+    }
+  }, [])
+
   const isAuthenticated = useMemo(() => !!user, [user])
   const isAdmin = useMemo(() => user?.role === "admin", [user])
 
@@ -111,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
         isAuthenticated,
         isAdmin,
       }}

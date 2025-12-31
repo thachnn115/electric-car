@@ -10,14 +10,19 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { productsApi } from "@/lib/api"
+import { Card, CardContent } from "@/components/ui/card"
+import { productsApi, reviewsApi } from "@/lib/api"
 import { formatCurrency, getProductImageUrl } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/error-handler"
 import { hasDiscount, calculateDiscountPercent } from "@/lib/product-helpers"
-import type { Product } from "@/lib/types"
+import type { Product, Review } from "@/lib/types"
 import { useCart } from "@/lib/cart-context"
 import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 interface ProductPageProps {
   readonly params: Promise<{ id: string }>
@@ -26,12 +31,21 @@ interface ProductPageProps {
 export default function ProductPage({ params }: ProductPageProps) {
   const resolvedParams = use(params)
   const [product, setProduct] = useState<Product | null>(null)
+  const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedImage, setSelectedImage] = useState(0)
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image: string } | null>(null)
   const [quantity, setQuantity] = useState(1)
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    title: "",
+    comment: "",
+  })
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
   const { addItem } = useCart()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -40,7 +54,11 @@ export default function ProductPage({ params }: ProductPageProps) {
         const response = await productsApi.getById(resolvedParams.id)
         setProduct(response.product)
         if (response.product.colors.length > 0) {
-          setSelectedColor(response.product.colors[0])
+          const firstColor = response.product.colors[0]
+          setSelectedColor(firstColor)
+          setSelectedImageIndex(null) // null means showing color image
+        } else {
+          setSelectedImageIndex(0) // Show first gallery image if no colors
         }
       } catch {
         notFound()
@@ -51,6 +69,58 @@ export default function ProductPage({ params }: ProductPageProps) {
 
     fetchProduct()
   }, [resolvedParams.id])
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!product?._id) return
+      try {
+        setIsLoadingReviews(true)
+        const response = await productsApi.getReviews(product._id)
+        setReviews(response.reviews || [])
+      } catch (error) {
+        // Silently fail - reviews are optional
+        console.error("Failed to fetch reviews:", error)
+      } finally {
+        setIsLoadingReviews(false)
+      }
+    }
+
+    fetchReviews()
+  }, [product?._id])
+
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated) {
+      toast.error("Bạn cần đăng nhập để đánh giá sản phẩm")
+      return
+    }
+
+    if (!product?._id) return
+
+    if (!reviewForm.title.trim() || !reviewForm.comment.trim()) {
+      toast.error("Vui lòng điền đầy đủ tiêu đề và nội dung đánh giá")
+      return
+    }
+
+    try {
+      setIsSubmittingReview(true)
+      await reviewsApi.create({
+        product: product._id,
+        rating: reviewForm.rating,
+        title: reviewForm.title.trim(),
+        comment: reviewForm.comment.trim(),
+      })
+      toast.success("Đánh giá của bạn đã được gửi thành công!")
+      setIsReviewDialogOpen(false)
+      setReviewForm({ rating: 5, title: "", comment: "" })
+      // Refresh reviews
+      const response = await productsApi.getReviews(product._id)
+      setReviews(response.reviews || [])
+    } catch (error) {
+      toast.error(getErrorMessage(error) || "Không thể gửi đánh giá")
+    } finally {
+      setIsSubmittingReview(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -64,7 +134,7 @@ export default function ProductPage({ params }: ProductPageProps) {
     )
   }
 
-  if (!product || !selectedColor) {
+  if (!product) {
     notFound()
   }
 
@@ -79,12 +149,37 @@ export default function ProductPage({ params }: ProductPageProps) {
       return
     }
 
+    if (product.colors && product.colors.length > 0 && !selectedColor) {
+      toast.error("Vui lòng chọn màu sắc")
+      return
+    }
+
     try {
-      await addItem(product, quantity, selectedColor.name)
-      toast.success(`Đã thêm ${quantity}x ${product.name} (${selectedColor.name}) vào giỏ hàng`)
+      const colorName = selectedColor?.name || "Mặc định"
+      await addItem(product, quantity, colorName)
+      toast.success(`Đã thêm ${quantity}x ${product.name}${selectedColor ? ` (${selectedColor.name})` : ""} vào giỏ hàng`)
     } catch (error) {
       toast.error(getErrorMessage(error))
     }
+  }
+
+  const getCurrentImage = (): string => {
+    if (selectedImageIndex !== null) {
+      return product.images[selectedImageIndex] || ""
+    }
+    if (selectedColor?.image) {
+      return selectedColor.image
+    }
+    return product.images[0] || ""
+  }
+
+  const handleColorSelect = (color: { name: string; hex: string; image: string }) => {
+    setSelectedColor(color)
+    setSelectedImageIndex(null) // Show color image when color is selected
+  }
+
+  const handleGalleryImageSelect = (index: number) => {
+    setSelectedImageIndex(index)
   }
 
   return (
@@ -108,7 +203,7 @@ export default function ProductPage({ params }: ProductPageProps) {
             <div className="space-y-4">
               <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
                 <Image
-                  src={getProductImageUrl(product.images[selectedImage] || "")}
+                  src={getProductImageUrl(getCurrentImage())}
                   alt={product.name}
                   fill
                   className="object-cover"
@@ -120,25 +215,60 @@ export default function ProductPage({ params }: ProductPageProps) {
                   </Badge>
                 )}
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {product.images.map((image, index) => (
-                  <button
-                    key={`image-${index}-${image}`}
-                    onClick={() => setSelectedImage(index)}
-                    className={`relative aspect-[4/3] w-24 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
-                      selectedImage === index
-                        ? "border-primary ring-2 ring-primary/20"
-                        : "border-transparent hover:border-primary/50"
-                    }`}
-                  >
-                    <Image
-                      src={getProductImageUrl(image || "")}
-                      alt={`${product.name} ${index + 1}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </button>
-                ))}
+              <div className="space-y-3">
+                {/* Color Images */}
+                {product.colors && product.colors.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Ảnh theo màu</p>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {product.colors.map((color) => (
+                        <button
+                          key={color.name}
+                          onClick={() => handleColorSelect(color)}
+                          className={`relative aspect-[4/3] w-24 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                            selectedColor?.name === color.name && selectedImageIndex === null
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-primary/50"
+                          }`}
+                          title={color.name}
+                        >
+                          <Image
+                            src={getProductImageUrl(color.image || "")}
+                            alt={`${product.name} - ${color.name}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Gallery Images */}
+                {product.images && product.images.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Ảnh sản phẩm</p>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {product.images.map((image, index) => (
+                        <button
+                          key={`image-${index}-${image}`}
+                          onClick={() => handleGalleryImageSelect(index)}
+                          className={`relative aspect-[4/3] w-24 shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                            selectedImageIndex === index
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-primary/50"
+                          }`}
+                        >
+                          <Image
+                            src={getProductImageUrl(image || "")}
+                            alt={`${product.name} ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -186,37 +316,39 @@ export default function ProductPage({ params }: ProductPageProps) {
               </div>
 
               {/* Colors */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Màu sắc</span>
-                  <span className="text-sm text-muted-foreground">{selectedColor.name}</span>
+              {product.colors && product.colors.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Màu sắc</span>
+                    <span className="text-sm text-muted-foreground">{selectedColor?.name || "Chưa chọn"}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {product.colors.map((color) => (
+                      <button
+                        key={color.name}
+                        onClick={() => handleColorSelect(color)}
+                        className={`relative h-10 w-10 rounded-full border-2 transition-all ${
+                          selectedColor?.name === color.name
+                            ? "border-primary ring-2 ring-primary/20"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                        style={{ backgroundColor: color.hex }}
+                        title={color.name}
+                      >
+                        {selectedColor?.name === color.name && (
+                          <Check
+                            className={`absolute inset-0 m-auto h-5 w-5 ${
+                              color.hex === "#FFFFFF" || color.hex === "#F5F5F5" || color.hex === "#F8F8F8"
+                                ? "text-foreground"
+                                : "text-white"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
-                  {product.colors.map((color) => (
-                    <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color)}
-                      className={`relative h-10 w-10 rounded-full border-2 transition-all ${
-                        selectedColor.name === color.name
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "border-border hover:border-primary/50"
-                      }`}
-                      style={{ backgroundColor: color.hex }}
-                      title={color.name}
-                    >
-                      {selectedColor.name === color.name && (
-                        <Check
-                          className={`absolute inset-0 m-auto h-5 w-5 ${
-                            color.hex === "#FFFFFF" || color.hex === "#F5F5F5" || color.hex === "#F8F8F8"
-                              ? "text-foreground"
-                              : "text-white"
-                          }`}
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* Quantity */}
               <div className="space-y-3">
@@ -288,6 +420,12 @@ export default function ProductPage({ params }: ProductPageProps) {
                 >
                   Thông số kỹ thuật
                 </TabsTrigger>
+                <TabsTrigger
+                  value="reviews"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                >
+                  Đánh giá ({reviews.length})
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="description" className="pt-6">
                 <p className="text-muted-foreground leading-relaxed">{product.description}</p>
@@ -305,6 +443,150 @@ export default function ProductPage({ params }: ProductPageProps) {
                 ) : (
                   <p className="text-muted-foreground">Chưa có thông số kỹ thuật</p>
                 )}
+              </TabsContent>
+              <TabsContent value="reviews" className="pt-6">
+                <div className="space-y-6">
+                  {/* Review Form */}
+                  {isAuthenticated && (
+                    <Card className="border-2 border-dashed">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-semibold">Viết đánh giá</h3>
+                          <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="outline">Viết đánh giá</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px]">
+                              <DialogHeader>
+                                <DialogTitle>Đánh giá sản phẩm</DialogTitle>
+                                <DialogDescription>
+                                  Chia sẻ trải nghiệm của bạn về sản phẩm này với cộng đồng
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label>Đánh giá sao</Label>
+                                  <div className="flex items-center gap-2">
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => setReviewForm((prev) => ({ ...prev, rating: i + 1 }))}
+                                        className="focus:outline-none"
+                                      >
+                                        <Star
+                                          className={`h-8 w-8 transition-colors ${
+                                            i < reviewForm.rating
+                                              ? "fill-yellow-400 text-yellow-400"
+                                              : "text-muted-foreground/30 hover:text-yellow-400/50"
+                                          }`}
+                                        />
+                                      </button>
+                                    ))}
+                                    <span className="text-sm text-muted-foreground ml-2">
+                                      {reviewForm.rating}/5 sao
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="review-title">
+                                    Tiêu đề <span className="text-destructive">*</span>
+                                  </Label>
+                                  <Input
+                                    id="review-title"
+                                    placeholder="Nhập tiêu đề đánh giá"
+                                    value={reviewForm.title}
+                                    onChange={(e) => setReviewForm((prev) => ({ ...prev, title: e.target.value }))}
+                                    maxLength={100}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="review-comment">
+                                    Nội dung đánh giá <span className="text-destructive">*</span>
+                                  </Label>
+                                  <Textarea
+                                    id="review-comment"
+                                    placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+                                    value={reviewForm.comment}
+                                    onChange={(e) => setReviewForm((prev) => ({ ...prev, comment: e.target.value }))}
+                                    rows={5}
+                                    maxLength={500}
+                                  />
+                                  <p className="text-xs text-muted-foreground text-right">
+                                    {reviewForm.comment.length}/500 ký tự
+                                  </p>
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
+                                  Hủy
+                                </Button>
+                                <Button onClick={handleSubmitReview} disabled={isSubmittingReview}>
+                                  {isSubmittingReview ? "Đang gửi..." : "Gửi đánh giá"}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Chia sẻ trải nghiệm của bạn để giúp người khác đưa ra quyết định tốt hơn
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Reviews List */}
+                  {isLoadingReviews ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Đang tải đánh giá...</p>
+                    </div>
+                  ) : reviews.length > 0 ? (
+                    <div className="space-y-6">
+                      {reviews.map((review) => {
+                        const userName = typeof review.user === "string" ? "Người dùng" : review.user?.name || "Người dùng"
+                        return (
+                          <div key={review._id} className="border-b pb-6 last:border-b-0">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold">{review.title}</h4>
+                                  <div className="flex items-center">
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <Star
+                                        key={`review-star-${i}`}
+                                        className={`h-4 w-4 ${
+                                          i < review.rating
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "text-muted-foreground/30"
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2">Bởi {userName}</p>
+                              </div>
+                              {review.createdAt && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(review.createdAt).toLocaleDateString("vi-VN")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-muted-foreground leading-relaxed">{review.comment}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Chưa có đánh giá nào cho sản phẩm này</p>
+                      {!isAuthenticated && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Đăng nhập để trở thành người đầu tiên đánh giá sản phẩm này
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>
