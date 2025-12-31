@@ -8,11 +8,10 @@ import {
   ShoppingCart,
   Users,
   Tag,
-  MessageSquare,
+  LogOut,
   Zap,
   ChevronLeft,
   Menu,
-  LogOut,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -24,7 +23,6 @@ const navigation = [
   { name: "Danh mục", href: "/admin/categories", icon: Package },
   { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart },
   { name: "Người dùng", href: "/admin/users", icon: Users },
-  { name: "Đánh giá", href: "/admin/reviews", icon: MessageSquare },
   { name: "Mã giảm giá", href: "/admin/discounts", icon: Tag },
 ]
 

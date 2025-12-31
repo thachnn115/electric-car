@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ordersApi } from "@/lib/api"
 import { formatCurrency } from "@/lib/utils"
-import { formatDate } from "@/lib/date-helpers"
 import { logger } from "@/lib/logger"
 import { useAuth } from "@/lib/auth-context"
 import type { Order } from "@/lib/types"
@@ -123,7 +122,7 @@ export default function OrdersPage() {
                           <Badge variant="outline">{paymentStatusLabels[order.paymentStatus]}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          Ngày đặt: {formatDate(order.createdAt)}
+                          Ngày đặt: {order.createdAt ? new Date(order.createdAt).toLocaleDateString("vi-VN") : "N/A"}
                         </p>
                         {order.shippingAddress && (
                           <p className="text-sm text-muted-foreground">Địa chỉ: {order.shippingAddress}</p>

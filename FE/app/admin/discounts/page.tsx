@@ -21,7 +21,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { discountsApi } from "@/lib/api"
 import { formatCurrency } from "@/lib/utils"
-import { formatDate } from "@/lib/date-helpers"
 import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import type { Discount } from "@/lib/types"
@@ -177,20 +176,6 @@ export default function AdminDiscountsPage() {
     return new Date(discount.endDate) < new Date()
   }
 
-  const getBadgeVariant = (discount: Discount): "destructive" | "secondary" | "default" => {
-    if (discount.isActive) {
-      return isExpired(discount) ? "secondary" : "default"
-    }
-    return "destructive"
-  }
-
-  const getBadgeLabel = (discount: Discount): string => {
-    if (discount.isActive) {
-      return isExpired(discount) ? "Hết hạn" : "Hoạt động"
-    }
-    return "Vô hiệu"
-  }
-
   return (
     <>
       <AdminHeader title="Quản lý mã giảm giá" description={`${discounts.length} mã giảm giá`} />
@@ -250,11 +235,23 @@ export default function AdminDiscountsPage() {
                           : "Không giới hạn"}
                       </TableCell>
                       <TableCell>
-                        {discount.endDate ? formatDate(discount.endDate) : "Không hết hạn"}
+                        {discount.endDate ? new Date(discount.endDate).toLocaleDateString("vi-VN") : "Không hết hạn"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getBadgeVariant(discount)}>
-                          {getBadgeLabel(discount)}
+                        <Badge
+                          variant={
+                            !discount.isActive
+                              ? "destructive"
+                              : isExpired(discount)
+                                ? "secondary"
+                                : "default"
+                              }
+                        >
+                          {!discount.isActive
+                            ? "Vô hiệu"
+                            : isExpired(discount)
+                              ? "Hết hạn"
+                              : "Hoạt động"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -402,7 +399,7 @@ export default function AdminDiscountsPage() {
                   onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.checked }))}
                   className="h-4 w-4"
                 />
-                <span>Kích hoạt mã giảm giá</span>
+                Kích hoạt mã giảm giá
               </Label>
             </div>
           </div>
