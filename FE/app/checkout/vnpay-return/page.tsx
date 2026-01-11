@@ -96,15 +96,15 @@ export default function VnpayReturnPage() {
               <div className="space-y-2">
                 <h1 className="text-2xl font-bold">
                   {state.loading
-                    ? "Dang xac nhan thanh toan..."
+                    ? "Đang xác nhận thanh toán..."
                     : isSuccess
-                      ? "Thanh toan thanh cong"
-                      : "Thanh toan that bai"}
+                      ? "Thanh toán thành công"
+                      : "Thanh toán thất bại"}
                 </h1>
                 <p className="text-muted-foreground">
                   {state.loading
-                    ? "Vui long cho trong giay lat."
-                    : state.message || (isSuccess ? "Da xac nhan thanh toan VNPay." : "Co loi xay ra. Vui long thu lai.")}
+                    ? "Vui lòng đợi trong giây lát"
+                    : state.message || (isSuccess ? "Đã xác nhận thanh toán VNPAY" : "Có lỗi xảy ra! Vui lòng thử lại.")}
                 </p>
               </div>
 
@@ -112,10 +112,10 @@ export default function VnpayReturnPage() {
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Package className="h-4 w-4" />
-                    <span>Ma don hang: #{state.orderId.slice(-8).toUpperCase()}</span>
+                    <span>Mã đơn hàng: #{state.orderId.slice(-8).toUpperCase()}</span>
                   </div>
                   {state.paymentStatus && (
-                    <p className="text-sm text-muted-foreground">Trang thai thanh toan: {state.paymentStatus}</p>
+                    <p className="text-sm text-muted-foreground">Trạng thái thành toán: {state.paymentStatus}</p>
                   )}
                 </div>
               )}
@@ -126,13 +126,13 @@ export default function VnpayReturnPage() {
                     <Link href="/orders" className="flex-1">
                       <Button variant="outline" className="w-full gap-2 bg-transparent">
                         <Package className="h-4 w-4" />
-                        Xem don hang
+                        Xem đơn hàng
                       </Button>
                     </Link>
                   )}
                   <Link href="/products" className="flex-1">
                     <Button className="w-full gap-2">
-                      Quay ve trang chu
+                      Quay về trang chủ
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </Link>

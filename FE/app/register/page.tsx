@@ -84,7 +84,7 @@ export default function RegisterPage() {
         phone: formData.phone.trim() || undefined,
         address: formData.address.trim() || undefined,
       })
-      toast.success("Đăng ký thành công! Chào mừng bạn đến với EV Car!")
+      toast.success("Đăng ký thành công! Chào mừng bạn đến với ThaoAuto!")
       router.push("/")
     } catch (error) {
       toast.error(getErrorMessage(error))

@@ -12,7 +12,7 @@ export function Footer() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
                 <Zap className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold tracking-tight">EV Car</span>
+              <span className="text-xl font-bold tracking-tight">ThaoAuto</span>
             </Link>
             <p className="text-sm text-muted-foreground">
               Đơn vị phân phối xe điện hàng đầu Việt Nam. Cam kết mang đến những sản phẩm chất lượng và dịch vụ tốt nhất
@@ -106,7 +106,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} EV Car. Tất cả quyền được bảo lưu.</p>
+          <p>&copy; {new Date().getFullYear()} ThaoAuto. Tất cả quyền được bảo lưu.</p>
         </div>
       </div>
     </footer>

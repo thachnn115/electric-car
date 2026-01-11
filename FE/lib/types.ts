@@ -139,6 +139,37 @@ export interface OrdersResponse {
   orders: Order[]
 }
 
+export interface AdminStatsTotals {
+  revenue: number
+  orders: number
+  paidOrders: number
+  products: number
+  customers: number
+  averageOrderValue: number
+}
+
+export interface AdminStatsResponse {
+  totals: AdminStatsTotals
+  orderStatusCounts: Record<Order["status"], number>
+  revenueByMonth: Array<{ year: number; month: number; revenue: number; orders: number }>
+  topProducts: Array<{
+    productId: string
+    name: string
+    image: string
+    quantitySold: number
+    revenue: number
+  }>
+  recentOrders: Array<{
+    id: string
+    userName: string
+    userEmail: string
+    finalTotal: number
+    status: Order["status"]
+    paymentStatus: Order["paymentStatus"]
+    createdAt: string
+  }>
+}
+
 export interface ReviewsResponse {
   total_reviews: number
   reviews: Review[]

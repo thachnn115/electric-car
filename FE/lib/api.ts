@@ -12,6 +12,7 @@ import type {
   CheckoutResponse,
   User,
   Discount,
+  AdminStatsResponse,
 } from "./types"
 import { API_BASE_URL } from "./constants"
 
@@ -309,6 +310,10 @@ export const ordersApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+}
+
+export const adminApi = {
+  getStats: (): Promise<AdminStatsResponse> => fetchApi<AdminStatsResponse>("/api/v1/admin/stats"),
 }
 
 export const checkoutApi = {
