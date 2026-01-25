@@ -26,7 +26,7 @@ import { toast } from "sonner"
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, total, isLoading } = useCart()
+  const { items, total, isLoading, clearCart } = useCart()
   const { user, isAuthenticated } = useAuth()
 
   const [formData, setFormData] = useState({
@@ -48,11 +48,6 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!isAuthenticated) {
-      toast.error("Bạn cần đăng nhập để thanh toán")
-      return
-    }
-
     if (!formData.name || !formData.email || !formData.phone || !formData.address) {
       toast.error("Vui lòng điền đầy đủ thông tin")
       return
@@ -61,20 +56,58 @@ export default function CheckoutPage() {
     setIsSubmitting(true)
 
     try {
-      const response = await checkoutApi.createOrder({
-        discountCode: discountCode || undefined,
-        paymentMethod: paymentMethod === "cod" ? "COD" : "VNPAY",
-        userPhone: formData.phone,
-        shippingAddress: formData.address,
-      })
+      if (isAuthenticated) {
+        const response = await checkoutApi.createOrder({
+          discountCode: discountCode || undefined,
+          paymentMethod: paymentMethod === "COD" ? "COD" : "VNPAY",
+          userPhone: formData.phone,
+          shippingAddress: formData.address,
+        })
 
-      if (paymentMethod === "cod") {
-        router.push("/checkout/success")
-      } else {
-        if (response.paymentUrl) {
-          window.location.href = response.paymentUrl
+        if (paymentMethod === "COD") {
+          await clearCart()
+          router.push("/checkout/success")
         } else {
-          throw new Error("Không nhận được URL thanh toán")
+          if (response.paymentUrl) {
+            await clearCart()
+            window.location.href = response.paymentUrl
+          } else {
+            throw new Error("Không nhận được URL thanh toán")
+          }
+        }
+      } else {
+        const orderItems = items.map((item) => {
+          const productId = typeof item.product === "string" ? item.product : item.product._id
+          return {
+            productId,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            color: item.color,
+            image: item.image,
+          }
+        })
+
+        const response = await checkoutApi.createGuestOrder({
+          items: orderItems,
+          discountCode: discountCode || undefined,
+          paymentMethod: paymentMethod === "COD" ? "COD" : "VNPAY",
+          userName: formData.name,
+          userEmail: formData.email,
+          userPhone: formData.phone,
+          shippingAddress: formData.address,
+        })
+
+        if (paymentMethod === "COD") {
+          await clearCart()
+          router.push("/checkout/success")
+        } else {
+          if (response.paymentUrl) {
+            await clearCart()
+            window.location.href = response.paymentUrl
+          } else {
+            throw new Error("Không nhận được URL thanh toán")
+          }
         }
       }
     } catch (error) {
@@ -83,20 +116,6 @@ export default function CheckoutPage() {
     }
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold">Vui lòng đăng nhập</h1>
-            <p className="text-muted-foreground">Bạn cần đăng nhập để thanh toán</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
 
   if (isLoading) {
     return (

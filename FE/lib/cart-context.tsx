@@ -22,6 +22,31 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 const AUTH_REQUIRED_MESSAGE = "Vui lòng đăng nhập"
+const GUEST_CART_KEY = "guest_cart"
+
+const saveGuestCart = (items: CartItem[]) => {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items))
+    } catch (error) {
+      logger.error("Failed to save guest cart:", error)
+    }
+  }
+}
+
+const loadGuestCart = (): CartItem[] => {
+  if (typeof window !== "undefined") {
+    try {
+      const stored = localStorage.getItem(GUEST_CART_KEY)
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch (error) {
+      logger.error("Failed to load guest cart:", error)
+    }
+  }
+  return []
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
@@ -30,7 +55,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const refreshCart = useCallback(async (showLoading = true) => {
     if (!isAuthenticated) {
-      setItems([])
+      const guestItems = loadGuestCart()
+      setItems(guestItems)
       setIsLoading(false)
       return
     }
@@ -55,15 +81,78 @@ export function CartProvider({ children }: { children: ReactNode }) {
     refreshCart()
   }, [refreshCart])
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      const guestItems = loadGuestCart()
+      if (guestItems.length > 0) {
+        const mergeGuestCart = async () => {
+          try {
+            for (const item of guestItems) {
+              const productId = typeof item.product === "string" ? item.product : item.product._id
+              try {
+                await cartApi.addItem(productId, item.quantity, item.color)
+              } catch (error) {
+                logger.error(`Failed to merge cart item ${productId}:`, error)
+              }
+            }
+            localStorage.removeItem(GUEST_CART_KEY)
+            await refreshCart()
+          } catch (error) {
+            logger.error("Failed to merge guest cart:", error)
+          }
+        }
+        void mergeGuestCart()
+      }
+    } else {
+      const guestItems = loadGuestCart()
+      setItems(guestItems)
+    }
+  }, [isAuthenticated, refreshCart])
+
   const addItem = useCallback(
     async (product: Product, quantity: number, color: string) => {
       if (!isAuthenticated) {
-        throw new Error(`${AUTH_REQUIRED_MESSAGE} để thêm sản phẩm vào giỏ hàng`)
+        const selectedColor = product.colors?.find((c) => c.name === color)
+        const itemPrice = selectedColor?.price !== undefined && selectedColor?.price !== null
+          ? selectedColor.price
+          : (product.price || 0)
+
+        setItems((prevItems) => {
+          const existingIndex = prevItems.findIndex(
+            (item) => {
+              const itemProductId = typeof item.product === "string" ? item.product : item.product._id
+              return itemProductId === product._id && item.color === color
+            }
+          )
+
+          let newItems: CartItem[]
+          if (existingIndex >= 0) {
+            newItems = prevItems.map((item, idx) =>
+              idx === existingIndex
+                ? { ...item, quantity: item.quantity + quantity }
+                : item
+            )
+          } else {
+            newItems = [
+              ...prevItems,
+              {
+                product: product._id,
+                name: product.name,
+                price: itemPrice,
+                quantity,
+                color,
+                image: product.images?.[0] || "",
+              },
+            ]
+          }
+          saveGuestCart(newItems)
+          return newItems
+        })
+        return
       }
 
       try {
         const response = await cartApi.addItem(product._id, quantity, color)
-        // Update with server response to ensure consistency
         if (response.cart?.items) {
           setItems(response.cart.items)
         }
@@ -77,10 +166,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeItem = useCallback(
     async (productId: string, color: string) => {
       if (!isAuthenticated) {
-        throw new Error(AUTH_REQUIRED_MESSAGE)
+        setItems((prevItems) => {
+          const newItems = prevItems.filter((item) => {
+            const itemProductId = typeof item.product === "string" ? item.product : item.product._id
+            return !(itemProductId === productId && item.color === color)
+          })
+          saveGuestCart(newItems)
+          return newItems
+        })
+        return
       }
 
-      // Optimistic update
       setItems((prevItems) =>
         prevItems.filter((item) => {
           const itemProductId = typeof item.product === "string" ? item.product : item.product._id
@@ -90,17 +186,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await cartApi.removeItem(productId, color)
-        // Update with server response to ensure consistency
         if (response.cart?.items) {
           setItems(response.cart.items)
         }
       } catch (error) {
-        // Revert on error by refreshing from server
         try {
           const response = await cartApi.get()
           setItems(response.cart.items || [])
         } catch {
-          // If refresh fails, keep optimistic update
         }
         throw handleApiError(error, "Không thể xóa sản phẩm")
       }
@@ -111,7 +204,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback(
     async (productId: string, color: string, quantity: number) => {
       if (!isAuthenticated) {
-        throw new Error(AUTH_REQUIRED_MESSAGE)
+        if (quantity <= 0) {
+          await removeItem(productId, color)
+          return
+        }
+
+        setItems((prevItems) => {
+          const newItems = prevItems.map((item) => {
+            const itemProductId = typeof item.product === "string" ? item.product : item.product._id
+            if (itemProductId === productId && item.color === color) {
+              return { ...item, quantity }
+            }
+            return item
+          })
+          saveGuestCart(newItems)
+          return newItems
+        })
+        return
       }
 
       if (quantity <= 0) {
@@ -119,7 +228,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Optimistic update
       setItems((prevItems) =>
         prevItems.map((item) => {
           const itemProductId = typeof item.product === "string" ? item.product : item.product._id
@@ -132,17 +240,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       try {
         const response = await cartApi.updateItem(productId, color, quantity)
-        // Update with server response to ensure consistency
         if (response.cart?.items) {
           setItems(response.cart.items)
         }
       } catch (error) {
-        // Revert on error by refreshing from server
         try {
           const response = await cartApi.get()
           setItems(response.cart.items || [])
         } catch {
-          // If refresh fails, keep optimistic update
         }
         throw handleApiError(error, "Không thể cập nhật số lượng")
       }
@@ -153,6 +258,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const clearCart = useCallback(async () => {
     if (!isAuthenticated) {
       setItems([])
+      saveGuestCart([])
       return
     }
 

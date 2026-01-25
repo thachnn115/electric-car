@@ -29,13 +29,18 @@ const addToCart = async (req, res) => {
     (item) => item.product.toString() === productId && item.color === color
   )
 
+  const selectedColor = product.colors?.find((c) => c.name === color)
+  const itemPrice = selectedColor?.price !== undefined && selectedColor?.price !== null
+    ? selectedColor.price
+    : (product.price || 0)
+
   if (existingIndex >= 0) {
     cart.items[existingIndex].quantity += Number(quantity)
   } else {
     cart.items.push({
       product: product._id,
       name: product.name,
-      price: product.price,
+      price: itemPrice,
       quantity: Number(quantity),
       color,
       image: product.images?.[0] || "",

@@ -50,6 +50,26 @@ export function hasDiscount(product: Product): boolean {
   return Boolean(product.originalPrice && product.originalPrice > product.price)
 }
 
+export function getColorPrice(color: Product["colors"][0] | undefined, productPrice: number): number {
+  if (color?.price !== undefined && color.price !== null) {
+    return color.price
+  }
+  return productPrice
+}
+
+export function getColorOriginalPrice(color: Product["colors"][0] | undefined, productOriginalPrice?: number): number | undefined {
+  if (color?.originalPrice !== undefined && color.originalPrice !== null) {
+    return color.originalPrice
+  }
+  return productOriginalPrice
+}
+
+export function hasColorDiscount(color: Product["colors"][0] | undefined, product: Product): boolean {
+  const colorPrice = getColorPrice(color, product.price)
+  const colorOriginalPrice = getColorOriginalPrice(color, product.originalPrice)
+  return Boolean(colorOriginalPrice && colorOriginalPrice > colorPrice)
+}
+
 // Product form validation constants
 export const PRODUCT_VALIDATION = {
   MAX_NAME_LENGTH: 150,
@@ -78,6 +98,8 @@ export interface ColorFormData {
   hex: string
   image: File | null
   preview?: string
+  price?: string
+  originalPrice?: string
 }
 
 export interface SpecFormData {

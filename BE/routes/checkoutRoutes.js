@@ -1,7 +1,10 @@
 const express = require("express")
 const router = express.Router()
 const { authenticateUser } = require("../middleware/authentication")
-const { createOrderFromCart, handleVnpayReturn } = require("../controllers/checkoutController")
+const { createOrderFromCart, createGuestOrder, handleVnpayReturn } = require("../controllers/checkoutController")
+
+// Guest creates order (no authentication required)
+router.post("/guest", createGuestOrder)
 
 // User creates order and receives VNPay payment URL
 router.post("/vnpay", authenticateUser, createOrderFromCart)

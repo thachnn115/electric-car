@@ -136,6 +136,101 @@ const createOrderFromCart = async (req, res) => {
   res.status(StatusCodes.CREATED).json({ paymentUrl, orderId: order._id, paymentIntentID: txnRef })
 }
 
+// Create guest order (no authentication required)
+const createGuestOrder = async (req, res) => {
+  const { items, discountCode, paymentMethod = "VNPAY", userName, userEmail, userPhone, shippingAddress } = req.body
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new CustomError.BadRequestError("Please provide order items")
+  }
+
+  if (!userName || !userEmail || !userPhone || !shippingAddress) {
+    throw new CustomError.BadRequestError("Please provide customer information")
+  }
+
+  for (const item of items) {
+    const product = await Product.findById(item.productId || item.product)
+    if (!product) throw new CustomError.NotFoundError(`Product not found: ${item.productId || item.product}`)
+    if (product.stock < item.quantity) {
+      throw new CustomError.BadRequestError(`Not enough stock for ${product.name}`)
+    }
+  }
+
+  let discountDoc = null
+  if (discountCode) {
+    discountDoc = await Discount.findOne({ code: discountCode.toUpperCase(), isActive: true })
+    const now = new Date()
+    if (!discountDoc) throw new CustomError.BadRequestError("Invalid discount code")
+    if (discountDoc.startDate && discountDoc.startDate > now) {
+      throw new CustomError.BadRequestError("Discount not started")
+    }
+    if (discountDoc.endDate && discountDoc.endDate < now) {
+      throw new CustomError.BadRequestError("Discount expired")
+    }
+    if (discountDoc.usageLimit && discountDoc.usedCount >= discountDoc.usageLimit) {
+      throw new CustomError.BadRequestError("Discount usage limit reached")
+    }
+  }
+
+  const orderItems = items.map((item) => ({
+    product: item.productId || item.product,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+    color: item.color,
+    image: item.image || "",
+  }))
+
+  const { subtotal, discountValue, shippingFee, tax, total, finalTotal } = calculateTotals(orderItems, discountDoc)
+
+  const txnRef = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+  const baseOrder = {
+    user: null,
+    userName,
+    userEmail,
+    userPhone,
+    shippingAddress,
+    orderItems,
+    subtotal,
+    discount: discountValue,
+    discountCode: discountDoc ? discountDoc.code : "",
+    shippingFee,
+    tax,
+    total,
+    finalTotal,
+    paymentMethod,
+  }
+
+  if (paymentMethod === "COD") {
+    const order = await Order.create({
+      ...baseOrder,
+      status: "confirmed",
+      paymentStatus: "pending",
+    })
+    if (discountDoc) {
+      await Discount.findOneAndUpdate({ code: discountDoc.code }, { $inc: { usedCount: 1 } }, { new: true })
+    }
+    return res.status(StatusCodes.CREATED).json({ order, message: "Order placed with COD" })
+  }
+
+  const order = await Order.create({
+    ...baseOrder,
+    status: "pending",
+    paymentStatus: "pending",
+    paymentIntentID: txnRef,
+  })
+
+  const paymentUrl = createPaymentUrl({
+    amount: finalTotal,
+    orderId: txnRef,
+    orderInfo: `Order ${order._id}`,
+    ipAddr: req.ip || req.connection?.remoteAddress,
+    returnUrl: process.env.VNPAY_RETURN_URL,
+  })
+
+  res.status(StatusCodes.CREATED).json({ paymentUrl, orderId: order._id, paymentIntentID: txnRef })
+}
+
 // VNPay return handler
 const handleVnpayReturn = async (req, res) => {
   const isValid = verifyReturn(req.query)
@@ -181,5 +276,6 @@ const handleVnpayReturn = async (req, res) => {
 
 module.exports = {
   createOrderFromCart,
+  createGuestOrder,
   handleVnpayReturn,
 }

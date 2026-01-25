@@ -14,7 +14,7 @@ const SingleOrderItemSchema = new mongoose.Schema(
 
 const OrderSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Types.ObjectId, ref: "User" },
     userName: { type: String, required: true },
     userEmail: { type: String, required: true },
     userPhone: { type: String, required: true },

@@ -46,10 +46,14 @@ const buildItemsFromRequest = async (items = []) => {
     if (product.stock < quantity) {
       throw new CustomError.BadRequestError(`Not enough stock for ${product.name}`)
     }
+    const selectedColor = product.colors?.find((c) => c.name === color)
+    const itemPrice = selectedColor?.price !== undefined && selectedColor?.price !== null
+      ? selectedColor.price
+      : (product.price || 0)
     built.push({
       product: product._id,
       name: product.name,
-      price: product.price,
+      price: itemPrice,
       quantity: Number(quantity),
       color,
       image: product.images?.[0] || "",

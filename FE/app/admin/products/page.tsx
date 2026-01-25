@@ -152,8 +152,10 @@ export default function AdminProductsPage() {
             hex: color.hex,
             image: null,
             preview: color.image,
+            price: color.price?.toString() || "",
+            originalPrice: color.originalPrice?.toString() || "",
           }))
-        : [{ id: crypto.randomUUID(), name: "", hex: "#000000", image: null }],
+        : [{ id: crypto.randomUUID(), name: "", hex: "#000000", image: null, price: "", originalPrice: "" }],
     )
     setSpecs(
       product.specs && product.specs.length > 0
@@ -214,7 +216,7 @@ export default function AdminProductsPage() {
     setColors((prev) => prev.filter((color) => color.id !== id))
   }
 
-  const updateColor = useCallback((id: string, field: "name" | "hex", value: string) => {
+  const updateColor = useCallback((id: string, field: "name" | "hex" | "price" | "originalPrice", value: string) => {
     if (field === "hex") {
       const hexValue = normalizeHexColor(value)
       if (!isValidPartialHexColor(hexValue)) {
@@ -282,21 +284,69 @@ export default function AdminProductsPage() {
 
     try {
       if (selectedProduct) {
-        await productsApi.update(selectedProduct._id, {
-          name: formData.name,
-          price: Number(formData.price),
-          originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
-          shortDescription: formData.shortDescription,
-          description: formData.description,
-          category: formData.category,
-          stock: Number(formData.stock),
-          colors: validColors.map((c) => ({
+        const colorsWithNewImages = validColors.filter((c) => c.image !== null)
+        const hasNewColorImages = colorsWithNewImages.length > 0
+        const hasNewGalleryImages = galleryImages.length > 0
+
+        if (hasNewColorImages || hasNewGalleryImages) {
+          const formDataToSend = new FormData()
+          formDataToSend.append("name", formData.name)
+          formDataToSend.append("price", formData.price)
+          if (formData.originalPrice) formDataToSend.append("originalPrice", formData.originalPrice)
+          formDataToSend.append("shortDescription", formData.shortDescription)
+          formDataToSend.append("description", formData.description)
+          formDataToSend.append("category", formData.category)
+          formDataToSend.append("stock", formData.stock)
+
+          if (hasNewGalleryImages) {
+            galleryImages.forEach((file) => {
+              formDataToSend.append("gallery", file)
+            })
+          } else {
+            formDataToSend.append("images", JSON.stringify(galleryPreviews))
+          }
+
+          const colorsData = validColors.map((c) => ({
             name: c.name,
             hex: c.hex,
-            image: c.preview || "",
-          })),
-          specs: specs.filter((s) => s.label && s.value),
-        })
+            image: c.image ? null : (c.preview || ""),
+            hasNewImage: c.image !== null,
+            price: c.price && c.price.trim() !== "" ? c.price : undefined,
+            originalPrice: c.originalPrice && c.originalPrice.trim() !== "" ? c.originalPrice : undefined,
+          }))
+          formDataToSend.append("colors", JSON.stringify(colorsData))
+
+          validColors.forEach((color) => {
+            if (color.image) {
+              formDataToSend.append("colorImages", color.image)
+            }
+          })
+
+          const validSpecs = specs.filter((s) => s.label && s.value)
+          if (validSpecs.length > 0) {
+            formDataToSend.append("specs", JSON.stringify(validSpecs))
+          }
+
+          await productsApi.updateWithFormData(selectedProduct._id, formDataToSend)
+        } else {
+          await productsApi.update(selectedProduct._id, {
+            name: formData.name,
+            price: Number(formData.price),
+            originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
+            shortDescription: formData.shortDescription,
+            description: formData.description,
+            category: formData.category,
+            stock: Number(formData.stock),
+            colors: validColors.map((c) => ({
+              name: c.name,
+              hex: c.hex,
+              image: c.preview || "",
+              price: c.price && c.price.trim() !== "" ? Number(c.price) : undefined,
+              originalPrice: c.originalPrice && c.originalPrice.trim() !== "" ? Number(c.originalPrice) : undefined,
+            })),
+            specs: specs.filter((s) => s.label && s.value),
+          })
+        }
         toast.success("Đã cập nhật sản phẩm thành công")
       } else {
         // Validate that all colors have image files (not just preview URLs)
@@ -325,6 +375,8 @@ export default function AdminProductsPage() {
         const colorsData = validColors.map((c) => ({
           name: c.name,
           hex: c.hex,
+          price: c.price && c.price.trim() !== "" ? c.price : undefined,
+          originalPrice: c.originalPrice && c.originalPrice.trim() !== "" ? c.originalPrice : undefined,
         }))
         formDataToSend.append("colors", JSON.stringify(colorsData))
 
@@ -671,9 +723,9 @@ export default function AdminProductsPage() {
                 {colors.map((color) => (
                   <div
                     key={color.id}
-                    className="flex gap-2 items-start p-3 border rounded-lg"
+                    className="flex gap-3 items-start p-4 border rounded-lg bg-muted/30"
                   >
-                    <div className="grid gap-2 flex-1">
+                    <div className="grid gap-3 flex-1">
                       <Input
                         placeholder="Tên màu (VD: Đỏ, Xanh)"
                         value={color.name}
@@ -695,6 +747,40 @@ export default function AdminProductsPage() {
                           pattern="^#[0-9A-Fa-f]{6}$"
                           maxLength={7}
                         />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs font-medium">Giá bán (tùy chọn)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            placeholder="Để trống dùng giá sản phẩm"
+                            value={color.price || ""}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0)) {
+                                updateColor(color.id, "price", value)
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs font-medium">Giá gốc (tùy chọn)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            placeholder="Để trống dùng giá sản phẩm"
+                            value={color.originalPrice || ""}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              if (value === "" || (!Number.isNaN(Number(value)) && Number(value) >= 0)) {
+                                updateColor(color.id, "originalPrice", value)
+                              }
+                            }}
+                          />
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <label className="flex-1 flex items-center justify-center px-3 py-2 border border-border rounded-md cursor-pointer hover:bg-accent">

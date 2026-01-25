@@ -11,8 +11,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "ThaoAuto - Xe Điện Cao Cấp",
-  description: "Đơn vị phân phối xe điện hàng đầu Việt Nam. Khám phá bộ sưu tập xe điện với công nghệ tiên tiến.",
+  title: "ThaoAuto - Xe Máy Điện Cao Cấp",
+  description: "Đơn vị phân phối xe máy điện hàng đầu Việt Nam. Khám phá bộ sưu tập xe máy điện với công nghệ tiên tiến.",
   generator: "v0.app",
   icons: {
     icon: [

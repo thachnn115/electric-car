@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { productsApi, reviewsApi } from "@/lib/api"
 import { formatCurrency, getProductImageUrl } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/error-handler"
-import { hasDiscount, calculateDiscountPercent } from "@/lib/product-helpers"
+import { hasDiscount, calculateDiscountPercent, getColorPrice, getColorOriginalPrice, hasColorDiscount } from "@/lib/product-helpers"
 import type { Product, Review } from "@/lib/types"
 import { useCart } from "@/lib/cart-context"
 import { useAuth } from "@/lib/auth-context"
@@ -35,7 +35,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingReviews, setIsLoadingReviews] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
-  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image: string } | null>(null)
+  const [selectedColor, setSelectedColor] = useState<Product["colors"][0] | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [reviewForm, setReviewForm] = useState({
@@ -138,17 +138,17 @@ export default function ProductPage({ params }: ProductPageProps) {
     notFound()
   }
 
-  const productHasDiscount = hasDiscount(product)
-  const discountPercent = productHasDiscount && product.originalPrice
-    ? calculateDiscountPercent(product.originalPrice, product.price)
+  const currentColor = selectedColor
+    ? product.colors.find((c) => c.name === selectedColor.name)
+    : product.colors[0]
+  const currentPrice = currentColor ? getColorPrice(currentColor, product.price) : product.price
+  const currentOriginalPrice = currentColor ? getColorOriginalPrice(currentColor, product.originalPrice) : product.originalPrice
+  const colorHasDiscount = currentColor ? hasColorDiscount(currentColor, product) : false
+  const discountPercent = colorHasDiscount && currentOriginalPrice
+    ? calculateDiscountPercent(currentOriginalPrice, currentPrice)
     : 0
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      toast.error("Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng")
-      return
-    }
-
     if (product.colors && product.colors.length > 0 && !selectedColor) {
       toast.error("Vui lòng chọn màu sắc")
       return
@@ -173,9 +173,9 @@ export default function ProductPage({ params }: ProductPageProps) {
     return product.images[0] || ""
   }
 
-  const handleColorSelect = (color: { name: string; hex: string; image: string }) => {
+  const handleColorSelect = (color: Product["colors"][0]) => {
     setSelectedColor(color)
-    setSelectedImageIndex(null) // Show color image when color is selected
+    setSelectedImageIndex(null)
   }
 
   const handleGalleryImageSelect = (index: number) => {
@@ -198,10 +198,10 @@ export default function ProductPage({ params }: ProductPageProps) {
             </Link>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-10">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Images */}
-            <div className="space-y-4">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
+            <div className="space-y-4 lg:space-y-6">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted shadow-lg">
                 <Image
                   src={getProductImageUrl(getCurrentImage())}
                   alt={product.name}
@@ -209,7 +209,7 @@ export default function ProductPage({ params }: ProductPageProps) {
                   className="object-cover"
                   priority
                 />
-                {productHasDiscount && discountPercent > 0 && (
+                {colorHasDiscount && discountPercent > 0 && (
                   <Badge variant="destructive" className="absolute top-4 left-4 text-sm">
                     -{discountPercent}%
                   </Badge>
@@ -273,7 +273,7 @@ export default function ProductPage({ params }: ProductPageProps) {
             </div>
 
             {/* Product Info */}
-            <div className="space-y-6">
+            <div className="space-y-6 lg:space-y-8">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
                 <div className="flex items-center gap-2">
@@ -296,19 +296,19 @@ export default function ProductPage({ params }: ProductPageProps) {
               </div>
 
               {/* Price */}
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold text-primary">{formatCurrency(product.price)}</span>
-                  {productHasDiscount && product.originalPrice && (
-                    <span className="text-lg text-muted-foreground line-through">
-                      {formatCurrency(product.originalPrice)}
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-3 transition-all duration-300">
+                  <span className="text-3xl lg:text-4xl font-bold text-primary">{formatCurrency(currentPrice)}</span>
+                  {colorHasDiscount && currentOriginalPrice && (
+                    <span className="text-lg lg:text-xl text-muted-foreground line-through">
+                      {formatCurrency(currentOriginalPrice)}
                     </span>
                   )}
                 </div>
                 {product.stock > 0 ? (
                   <p className="text-sm text-green-600 flex items-center gap-1">
                     <Check className="h-4 w-4" />
-                    Còn {product.stock} xe trong kho
+                    Còn {product.stock} xe máy điện trong kho
                   </p>
                 ) : (
                   <p className="text-sm text-destructive">Hết hàng</p>
@@ -317,42 +317,45 @@ export default function ProductPage({ params }: ProductPageProps) {
 
               {/* Colors */}
               {product.colors && product.colors.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-3 lg:space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">Màu sắc</span>
-                    <span className="text-sm text-muted-foreground">{selectedColor?.name || "Chưa chọn"}</span>
+                    <span className="font-medium text-base lg:text-lg">Màu sắc</span>
+                    <span className="text-sm lg:text-base text-muted-foreground font-medium">{selectedColor?.name || product.colors[0]?.name || "Chưa chọn"}</span>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {product.colors.map((color) => (
-                      <button
-                        key={color.name}
-                        onClick={() => handleColorSelect(color)}
-                        className={`relative h-10 w-10 rounded-full border-2 transition-all ${
-                          selectedColor?.name === color.name
-                            ? "border-primary ring-2 ring-primary/20"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                        style={{ backgroundColor: color.hex }}
-                        title={color.name}
-                      >
-                        {selectedColor?.name === color.name && (
-                          <Check
-                            className={`absolute inset-0 m-auto h-5 w-5 ${
-                              color.hex === "#FFFFFF" || color.hex === "#F5F5F5" || color.hex === "#F8F8F8"
-                                ? "text-foreground"
-                                : "text-white"
-                            }`}
-                          />
-                        )}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-3 lg:gap-4">
+                    {product.colors.map((color) => {
+                      const isSelected = selectedColor?.name === color.name || (!selectedColor && product.colors[0]?.name === color.name)
+                      return (
+                        <button
+                          key={color.name}
+                          onClick={() => handleColorSelect(color)}
+                          className={`relative h-12 w-12 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
+                            isSelected
+                              ? "border-primary ring-2 ring-primary/20 shadow-md"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                          style={{ backgroundColor: color.hex }}
+                          title={color.name}
+                        >
+                          {isSelected && (
+                            <Check
+                              className={`absolute inset-0 m-auto h-5 w-5 ${
+                                color.hex === "#FFFFFF" || color.hex === "#F5F5F5" || color.hex === "#F8F8F8"
+                                  ? "text-foreground"
+                                  : "text-white"
+                              }`}
+                            />
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
               {/* Quantity */}
-              <div className="space-y-3">
-                <span className="font-medium">Số lượng</span>
+              <div className="space-y-3 lg:space-y-4">
+                <span className="font-medium text-base lg:text-lg">Số lượng</span>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center border rounded-lg">
                     <Button
@@ -379,15 +382,15 @@ export default function ProductPage({ params }: ProductPageProps) {
               </div>
 
               {/* Add to Cart */}
-              <div className="flex gap-4">
-                <Button size="lg" className="flex-1 gap-2" onClick={handleAddToCart} disabled={product.stock === 0}>
+              <div className="flex gap-4 pt-2">
+                <Button size="lg" className="flex-1 gap-2 h-12 lg:h-14 text-base lg:text-lg font-semibold" onClick={handleAddToCart} disabled={product.stock === 0}>
                   <ShoppingCart className="h-5 w-5" />
                   Thêm vào giỏ hàng
                 </Button>
               </div>
 
               {/* Features */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-3 gap-4 lg:gap-6 pt-6 border-t">
                 <div className="flex flex-col items-center text-center gap-2">
                   <Truck className="h-6 w-6 text-primary" />
                   <span className="text-xs text-muted-foreground">Giao hàng toàn quốc</span>

@@ -17,6 +17,8 @@ const ProductSchema = new mongoose.Schema(
           name: { type: String, required: true, trim: true },
           hex: { type: String, required: true, match: /^#/ },
           image: { type: String, required: true },
+          price: { type: Number, min: 0 },
+          originalPrice: { type: Number, min: 0 },
         },
       ],
       required: true,

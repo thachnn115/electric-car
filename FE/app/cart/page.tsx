@@ -43,21 +43,6 @@ export default function CartPage() {
 
   const finalTotal = total - (appliedDiscount?.amount || 0)
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h1 className="text-2xl font-bold">Vui lòng đăng nhập</h1>
-            <p className="text-muted-foreground">Bạn cần đăng nhập để xem giỏ hàng</p>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col">

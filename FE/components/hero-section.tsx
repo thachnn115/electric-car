@@ -12,7 +12,7 @@ export function HeroSection() {
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
               <Zap className="h-4 w-4" />
-              <span>Công nghệ xe điện tiên tiến</span>
+              <span>Công nghệ xe máy điện tiên tiến</span>
             </div>
 
             <h1 className="text-4xl lg:text-6xl font-bold tracking-tight text-balance">
@@ -21,7 +21,7 @@ export function HeroSection() {
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-lg">
-              Khám phá bộ sưu tập xe điện cao cấp với công nghệ tiên tiến, thiết kế sang trọng và thân thiện với môi
+              Khám phá bộ sưu tập xe máy điện cao cấp với công nghệ tiên tiến, thiết kế sang trọng và thân thiện với môi
               trường. Trải nghiệm cuộc sống xanh ngay hôm nay.
             </p>
 

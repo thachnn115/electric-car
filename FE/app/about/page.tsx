@@ -60,7 +60,7 @@ export default function AboutPage() {
                 Về chúng tôi
               </h1>
               <p className="text-lg text-muted-foreground">
-                Chúng tôi là đơn vị hàng đầu trong lĩnh vực xe điện tại Việt Nam, 
+                Chúng tôi là đơn vị hàng đầu trong lĩnh vực xe máy điện tại Việt Nam, 
                 cam kết mang đến những sản phẩm chất lượng cao và dịch vụ tốt nhất cho khách hàng.
               </p>
             </div>
@@ -76,7 +76,7 @@ export default function AboutPage() {
                 <p className="text-muted-foreground leading-relaxed">
                   Chúng tôi tin rằng việc chuyển đổi sang phương tiện giao thông điện 
                   là bước đi quan trọng để xây dựng một tương lai bền vững. Sứ mệnh của 
-                  chúng tôi là mang đến những chiếc xe điện chất lượng cao, giá cả hợp lý, 
+                  chúng tôi là mang đến những chiếc xe máy điện chất lượng cao, giá cả hợp lý, 
                   giúp mọi người dễ dàng tiếp cận với công nghệ xanh.
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
@@ -179,7 +179,7 @@ export default function AboutPage() {
             <div className="text-center space-y-6 max-w-2xl mx-auto">
               <h2 className="text-3xl font-bold">Sẵn sàng bắt đầu hành trình xanh?</h2>
               <p className="text-lg opacity-90">
-                Khám phá bộ sưu tập xe điện của chúng tôi và tìm chiếc xe phù hợp với bạn
+                Khám phá bộ sưu tập xe máy điện của chúng tôi và tìm chiếc xe phù hợp với bạn
               </p>
               <div className="flex gap-4 justify-center">
                 <Link href="/products">

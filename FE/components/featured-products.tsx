@@ -45,7 +45,7 @@ export function FeaturedProducts() {
         <div className="flex items-end justify-between mb-10">
           <div className="space-y-2">
             <h2 className="text-3xl lg:text-4xl font-bold tracking-tight">Sản phẩm nổi bật</h2>
-            <p className="text-muted-foreground">Khám phá những mẫu xe điện được yêu thích nhất</p>
+            <p className="text-muted-foreground">Khám phá những mẫu xe máy điện được yêu thích nhất</p>
           </div>
           <Link href="/products" className="hidden sm:block">
             <Button variant="ghost" className="gap-2">

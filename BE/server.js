@@ -43,11 +43,11 @@ app.use(express.static("./public"))
 app.use(fileUpload())
 
 app.get("/", (req, res) => {
-  res.send("<h1>Electric Car API</h1>")
+  res.send("<h1>Electric Motorcycle API</h1>")
 })
 
 app.get("/api/v1/", (req, res) => {
-  res.send("Electric Car API")
+  res.send("Electric Motorcycle API")
 })
 
 app.use("/api/v1/auth", authRouter)

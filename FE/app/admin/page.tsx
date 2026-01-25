@@ -1,15 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Package, ShoppingCart, Users, DollarSign, TrendingUp, TrendingDown, ArrowUpRight, Loader2 } from "lucide-react"
+import { Package, ShoppingCart, Users, DollarSign, TrendingUp, TrendingDown, ArrowUpRight, Loader2, Calendar } from "lucide-react"
 import { AdminHeader } from "@/components/admin/admin-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { adminApi } from "@/lib/api"
 import { formatCurrency, getStatusLabel } from "@/lib/utils"
 import type { AdminStatsResponse } from "@/lib/types"
 import { getErrorMessage } from "@/lib/error-handler"
 import { toast } from "sonner"
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from "recharts"
 
 type Trend = "up" | "down" | "neutral"
 
@@ -47,14 +49,26 @@ const statusColors: Record<string, string> = {
 }
 
 export default function AdminDashboardPage() {
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+
   const [stats, setStats] = useState<AdminStatsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Filters
+  const [filterType, setFilterType] = useState<string>("month")
+  const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString())
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth.toString())
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setIsLoading(true)
-        const response = await adminApi.getStats()
+        const response = await adminApi.getStats({
+          type: filterType,
+          year: parseInt(selectedYear),
+          month: parseInt(selectedMonth)
+        })
         setStats(response)
       } catch (error) {
         toast.error(getErrorMessage(error))
@@ -64,24 +78,21 @@ export default function AdminDashboardPage() {
     }
 
     fetchStats()
-  }, [])
+  }, [filterType, selectedYear, selectedMonth])
 
   const totals = stats?.totals ?? emptyTotals
-  const revenueByMonth = stats?.revenueByMonth ?? []
+  const chartData = stats?.chartData ?? []
   const recentOrders = stats?.recentOrders ?? []
   const topProducts = stats?.topProducts ?? []
 
-  const revenueChange = useMemo(() => {
-    if (revenueByMonth.length < 2) return null
-    const current = revenueByMonth[revenueByMonth.length - 1]
-    const previous = revenueByMonth[revenueByMonth.length - 2]
-    return getPercentChange(current.revenue, previous.revenue)
-  }, [revenueByMonth])
+  // Simplify revenue change calculation for now as dynamic periods make "previous" ambiguous without more data
+  // Could be improved by fetching previous period data separately if needed
+  const revenueChange = null
 
   const statCards = useMemo(
     () => [
       {
-        name: "Tổng danh thu",
+        name: "Tổng doanh thu",
         value: isLoading ? "--" : formatCurrency(totals.revenue),
         change: formatChangeLabel(revenueChange),
         trend: getTrend(revenueChange),
@@ -91,33 +102,93 @@ export default function AdminDashboardPage() {
         name: "Đơn hàng",
         value: isLoading ? "--" : totals.orders.toString(),
         change: "--",
-        trend: "neutral",
+        trend: "neutral" as Trend,
         icon: ShoppingCart,
       },
       {
         name: "Sản phẩm",
         value: isLoading ? "--" : totals.products.toString(),
         change: "--",
-        trend: "neutral",
+        trend: "neutral" as Trend,
         icon: Package,
       },
       {
         name: "Người dùng",
         value: isLoading ? "--" : totals.customers.toString(),
         change: "--",
-        trend: "neutral",
+        trend: "neutral" as Trend,
         icon: Users,
       },
     ],
     [isLoading, totals, revenueChange]
   )
 
+  // Generate year options (last 5 years)
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
+  const months = Array.from({ length: 12 }, (_, i) => i + 1)
+
   return (
     <>
       <AdminHeader title="Dashboard" description="Tổng quan hệ thống" />
 
       <main className="p-6 space-y-6">
-        {/* Stats Grid */}
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-lg border shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-primary/10 rounded-full">
+              <Calendar className="h-5 w-5 text-primary" />
+            </div>
+            <span className="font-semibold text-lg">Thống kê doanh thu</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Xem theo:</span>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[110px] bg-background">
+                  <SelectValue placeholder="Chọn loại" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Ngày</SelectItem>
+                  <SelectItem value="month">Tháng</SelectItem>
+                  <SelectItem value="year">Năm</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(filterType === "day" || filterType === "month") && (
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-[100px] bg-background">
+                  <SelectValue placeholder="Năm" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((y) => (
+                    <SelectItem key={y} value={y.toString()}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {filterType === "day" && (
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[110px] bg-background">
+                  <SelectValue placeholder="Tháng" />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m) => (
+                    <SelectItem key={m} value={m.toString()}>
+                      Tháng {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+
+        {/* Stats Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((stat) => {
             const trendClass =
@@ -131,10 +202,11 @@ export default function AdminDashboardPage() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                       <stat.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <div className={`flex items-center gap-1 text-sm font-medium ${trendClass}`}>
+                    {/* Hide change for now as logic is simplified */}
+                    {/* <div className={`flex items-center gap-1 text-sm font-medium ${trendClass}`}>
                       {stat.change}
                       {TrendIcon ? <TrendIcon className="h-4 w-4" /> : null}
-                    </div>
+                    </div> */}
                   </div>
                   <div className="mt-4">
                     <p className="text-2xl font-bold">{stat.value}</p>
@@ -145,6 +217,63 @@ export default function AdminDashboardPage() {
             )
           })}
         </div>
+
+        {/* Charts */}
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Biểu đồ doanh thu</CardTitle>
+            <CardDescription>
+              {filterType === 'day' ? `Thống kê ngày trong tháng ${selectedMonth}/${selectedYear}` :
+                filterType === 'month' ? `Thống kê tháng trong năm ${selectedYear}` :
+                  `Thống kê theo năm`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[350px] w-full">
+              {isLoading ? (
+                <div className="flex h-full items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => filterType === 'month' ? `T${value}` : `${value}`}
+                    />
+                    <YAxis
+                      stroke="#888888"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${value / 1000000}M`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(label) => {
+                        if (filterType === 'month') return `Tháng ${label}`
+                        if (filterType === 'day') return `Ngày ${label}`
+                        return `Năm ${label}`
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" name="Doanh thu" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                  <p>Không có dữ liệu cho giai đoạn này.</p>
+                  <p className="text-sm">Vui lòng thử chọn Năm hoặc Tháng khác.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Recent Orders */}
@@ -209,7 +338,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">Da ban {product.quantitySold}</p>
+                        <p className="text-sm text-muted-foreground">{product.quantitySold} đã bán</p>
                       </div>
                       <p className="font-semibold text-primary">{formatCurrency(product.revenue)}</p>
                     </div>

@@ -21,7 +21,7 @@ export function ProductCard({ product }: ProductCardProps) {
     : 0
 
   return (
-    <Card className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
+    <Card className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <Link href={`/products/${product._id}`}>
         <div className="relative aspect-[4/3] overflow-hidden bg-muted">
           <Image
@@ -39,7 +39,7 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
           {product.stock <= 5 && product.stock > 0 && (
             <Badge variant="secondary" className="absolute top-3 right-3 shadow-md">
-              Còn {product.stock} xe
+              Còn {product.stock} xe máy điện
             </Badge>
           )}
           {product.stock === 0 && (
@@ -50,14 +50,14 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
       </Link>
 
-      <CardContent className="p-4 space-y-3">
-        <div className="space-y-1.5">
+      <CardContent className="p-4 lg:p-5 space-y-3 lg:space-y-4">
+        <div className="space-y-2">
           <Link href={`/products/${product._id}`}>
-            <h3 className="font-semibold text-lg leading-tight hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
+            <h3 className="font-semibold text-lg lg:text-xl leading-tight hover:text-primary transition-colors line-clamp-2 min-h-[3rem]">
               {product.name}
             </h3>
           </Link>
-          <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">{product.shortDescription}</p>
+          <p className="text-sm lg:text-base text-muted-foreground line-clamp-2 min-h-[2.5rem]">{product.shortDescription}</p>
         </div>
 
         <div className="flex items-center justify-between">
@@ -95,11 +95,11 @@ export function ProductCard({ product }: ProductCardProps) {
         </div>
 
         {/* Price */}
-        <div className="flex items-end justify-between pt-2 border-t border-border/50">
+        <div className="flex items-end justify-between pt-3 border-t border-border/50">
           <div className="space-y-0.5">
-            <p className="text-xl font-bold text-primary">{formatCurrency(product.price)}</p>
+            <p className="text-xl lg:text-2xl font-bold text-primary">{formatCurrency(product.price)}</p>
             {productHasDiscount && product.originalPrice && (
-              <p className="text-sm text-muted-foreground line-through">{formatCurrency(product.originalPrice)}</p>
+              <p className="text-sm lg:text-base text-muted-foreground line-through">{formatCurrency(product.originalPrice)}</p>
             )}
           </div>
           <Button

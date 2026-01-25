@@ -15,7 +15,7 @@ export function Footer() {
               <span className="text-xl font-bold tracking-tight">ThaoAuto</span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Đơn vị phân phối xe điện hàng đầu Việt Nam. Cam kết mang đến những sản phẩm chất lượng và dịch vụ tốt nhất
+              Đơn vị phân phối xe máy điện hàng đầu Việt Nam. Cam kết mang đến những sản phẩm chất lượng và dịch vụ tốt nhất
               cho khách hàng.
             </p>
             <div className="flex gap-4">

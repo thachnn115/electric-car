@@ -6,7 +6,7 @@ export interface Product {
   description: string
   shortDescription: string
   images: string[]
-  colors: { name: string; hex: string; image: string }[]
+  colors: { name: string; hex: string; image: string; price?: number; originalPrice?: number }[]
   category: string | { _id: string; name: string; slug: string }
   specs: { label: string; value: string }[]
   stock: number
@@ -151,7 +151,8 @@ export interface AdminStatsTotals {
 export interface AdminStatsResponse {
   totals: AdminStatsTotals
   orderStatusCounts: Record<Order["status"], number>
-  revenueByMonth: Array<{ year: number; month: number; revenue: number; orders: number }>
+  chartData: Array<{ label: string | number; revenue: number; orders: number }>
+  revenueByMonth?: Array<{ year: number; month: number; revenue: number; orders: number }>
   topProducts: Array<{
     productId: string
     name: string

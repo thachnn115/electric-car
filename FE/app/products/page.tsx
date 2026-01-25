@@ -187,13 +187,13 @@ export default function ProductsPage() {
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">Sản phẩm</h1>
-            <p className="text-muted-foreground mt-1">Khám phá bộ sưu tập xe điện của chúng tôi</p>
+            <p className="text-muted-foreground mt-1">Khám phá bộ sưu tập xe máy điện của chúng tôi</p>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-8">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
             {/* Desktop Sidebar */}
             <aside className="hidden lg:block w-64 shrink-0">
-              <div className="sticky top-20">
+              <div className="sticky top-24">
                 <FilterContent />
               </div>
             </aside>
@@ -206,7 +206,7 @@ export default function ProductsPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Tìm kiếm xe..."
+                    placeholder="Tìm kiếm xe máy điện..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9"
@@ -267,7 +267,7 @@ export default function ProductsPage() {
                   <p className="text-lg text-muted-foreground">Đang tải...</p>
                 </div>
               ) : filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
                   {filteredProducts.map((product) => (
                     <ProductCard key={product._id} product={product} />
                   ))}

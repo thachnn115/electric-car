@@ -101,7 +101,7 @@ export default function CategoriesPage() {
               </div>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Danh mục sản phẩm</h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Khám phá bộ sưu tập xe điện đa dạng của chúng tôi
+                Khám phá bộ sưu tập xe máy điện đa dạng của chúng tôi
               </p>
             </div>
           </div>

@@ -43,7 +43,7 @@ export function CategorySection() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-10 space-y-2">
           <h2 className="text-3xl lg:text-4xl font-bold tracking-tight">Danh mục sản phẩm</h2>
-          <p className="text-muted-foreground">Tìm kiếm xe điện phù hợp với nhu cầu của bạn</p>
+          <p className="text-muted-foreground">Tìm kiếm xe máy điện phù hợp với nhu cầu của bạn</p>
         </div>
 
         {categories.length > 0 ? (

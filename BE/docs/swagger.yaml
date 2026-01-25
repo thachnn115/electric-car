@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Electric Car API
+  title: Electric Motorcycle API
   version: "1.0.0"
   description: API backend (auth, users, products, categories, cart, checkout, orders, discounts)
 servers:

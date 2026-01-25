@@ -22,7 +22,7 @@ interface ApiError {
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
-  
+
   const isFormData = options.body instanceof FormData
   const defaultHeaders: HeadersInit = isFormData ? {} : { "Content-Type": "application/json" }
 
@@ -53,16 +53,16 @@ export const productsApi = {
     const endpoint = queryString ? `/api/v1/products?${queryString}` : "/api/v1/products"
     return fetchApi<ProductsResponse>(endpoint)
   },
-  
+
   getById: (id: string): Promise<{ product: Product }> =>
     fetchApi<{ product: Product }>(`/api/v1/products/${id}`),
-  
+
   getReviews: (id: string): Promise<ReviewsResponse> =>
     fetchApi<ReviewsResponse>(`/api/v1/products/${id}/reviews`),
-  
+
   getAllAdmin: (): Promise<{ total_products: number; products: Product[] }> =>
     fetchApi<{ total_products: number; products: Product[] }>("/api/v1/products/admin"),
-  
+
   searchAdmin: (params: {
     q?: string
     category?: string
@@ -80,25 +80,32 @@ export const productsApi = {
     const endpoint = queryString ? `/api/v1/products/admin/search?${queryString}` : "/api/v1/products/admin/search"
     return fetchApi<{ total_products: number; products: Product[] }>(endpoint)
   },
-  
+
   create: (data: FormData): Promise<{ product: Product }> =>
     fetchApi<{ product: Product }>("/api/v1/products", {
       method: "POST",
       headers: {},
       body: data,
     }),
-  
+
   update: (id: string, data: Partial<Product>): Promise<{ product: Product }> =>
     fetchApi<{ product: Product }>(`/api/v1/products/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
+  updateWithFormData: (id: string, data: FormData): Promise<{ product: Product }> =>
+    fetchApi<{ product: Product }>(`/api/v1/products/${id}`, {
+      method: "PATCH",
+      headers: {},
+      body: data,
+    }),
+
   delete: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/products/${id}`, {
       method: "DELETE",
     }),
-  
+
   uploadImage: (file: File): Promise<{ image: string }> => {
     const formData = new FormData()
     formData.append("image", file)
@@ -113,28 +120,28 @@ export const productsApi = {
 export const categoriesApi = {
   getAll: (): Promise<CategoriesResponse> =>
     fetchApi<CategoriesResponse>("/api/v1/public/categories"),
-  
+
   getProductsByCategory: (slug: string): Promise<CategoryProductsResponse> =>
     fetchApi<CategoryProductsResponse>(`/api/v1/public/categories/${slug}/products`),
-  
+
   getAllAdmin: (): Promise<CategoriesResponse> =>
     fetchApi<CategoriesResponse>("/api/v1/categories"),
-  
+
   getById: (id: string): Promise<{ category: Category }> =>
     fetchApi<{ category: Category }>(`/api/v1/categories/${id}`),
-  
+
   create: (data: { name: string; slug?: string; description?: string }): Promise<{ category: Category }> =>
     fetchApi<{ category: Category }>("/api/v1/categories", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   update: (id: string, data: { name?: string; slug?: string; description?: string }): Promise<{ category: Category }> =>
     fetchApi<{ category: Category }>(`/api/v1/categories/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   delete: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/categories/${id}`, {
       method: "DELETE",
@@ -143,25 +150,25 @@ export const categoriesApi = {
 
 export const cartApi = {
   get: (): Promise<CartResponse> => fetchApi<CartResponse>("/api/v1/cart"),
-  
+
   addItem: (productId: string, quantity: number, color: string): Promise<CartResponse> =>
     fetchApi<CartResponse>("/api/v1/cart", {
       method: "POST",
       body: JSON.stringify({ productId, quantity, color }),
     }),
-  
+
   updateItem: (productId: string, color: string, quantity: number): Promise<CartResponse> =>
     fetchApi<CartResponse>("/api/v1/cart", {
       method: "PATCH",
       body: JSON.stringify({ productId, color, quantity }),
     }),
-  
+
   removeItem: (productId: string, color: string): Promise<CartResponse> =>
     fetchApi<CartResponse>("/api/v1/cart/item", {
       method: "DELETE",
       body: JSON.stringify({ productId, color }),
     }),
-  
+
   clear: (): Promise<CartResponse> =>
     fetchApi<CartResponse>("/api/v1/cart", {
       method: "DELETE",
@@ -183,13 +190,13 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   login: (email: string, password: string): Promise<{ user: User; msg: string }> =>
     fetchApi<{ user: User; msg: string }>("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
-  
+
   logout: (): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>("/api/v1/auth/logout", {
       method: "GET",
@@ -199,7 +206,7 @@ export const authApi = {
 export const usersApi = {
   getCurrentUser: (): Promise<{ user: User }> =>
     fetchApi<{ user: User }>("/api/v1/users/showMe"),
-  
+
   updateUser: (data: {
     name?: string
     email?: string
@@ -213,19 +220,19 @@ export const usersApi = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   updatePassword: (oldPassword: string, newPassword: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>("/api/v1/users/updateUserPassword", {
       method: "PATCH",
       body: JSON.stringify({ oldPassword, newPassword }),
     }),
-  
+
   getAll: (): Promise<{ total_users: number; users: User[] }> =>
     fetchApi<{ total_users: number; users: User[] }>("/api/v1/users"),
-  
+
   getById: (id: string): Promise<{ user: User }> =>
     fetchApi<{ user: User }>(`/api/v1/users/${id}`),
-  
+
   createAdmin: (data: {
     name: string
     email: string
@@ -238,7 +245,7 @@ export const usersApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   updateAdmin: (id: string, data: {
     name?: string
     email?: string
@@ -250,7 +257,7 @@ export const usersApi = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   deleteAdmin: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/users/${id}`, {
       method: "DELETE",
@@ -259,13 +266,13 @@ export const usersApi = {
 
 export const ordersApi = {
   getAll: (): Promise<OrdersResponse> => fetchApi<OrdersResponse>("/api/v1/orders"),
-  
+
   getMyOrders: (): Promise<OrdersResponse> =>
     fetchApi<OrdersResponse>("/api/v1/orders/showAllMyOrders"),
-  
+
   getById: (id: string): Promise<{ order: Order }> =>
     fetchApi<{ order: Order }>(`/api/v1/orders/${id}`),
-  
+
   create: (data: {
     orderItems: Array<{ productId: string; quantity: number; color: string }>
     subtotal: number
@@ -282,18 +289,18 @@ export const ordersApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   update: (id: string, data: { status?: Order["status"]; paymentStatus?: Order["paymentStatus"] }): Promise<{ order: Order }> =>
     fetchApi<{ order: Order }>(`/api/v1/orders/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   delete: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/orders/${id}`, {
       method: "DELETE",
     }),
-  
+
   createOfflineAdmin: (data: {
     items: Array<{ productId: string; quantity: number; color: string }>
     discountCode?: string
@@ -313,7 +320,15 @@ export const ordersApi = {
 }
 
 export const adminApi = {
-  getStats: (): Promise<AdminStatsResponse> => fetchApi<AdminStatsResponse>("/api/v1/admin/stats"),
+  getStats: (params?: { type?: string; year?: number; month?: number }): Promise<AdminStatsResponse> => {
+    const queryParams = new URLSearchParams()
+    if (params?.type) queryParams.append("type", params.type)
+    if (params?.year) queryParams.append("year", params.year.toString())
+    if (params?.month) queryParams.append("month", params.month.toString())
+    const queryString = queryParams.toString()
+    const endpoint = queryString ? `/api/v1/admin/stats?${queryString}` : "/api/v1/admin/stats"
+    return fetchApi<AdminStatsResponse>(endpoint)
+  },
 }
 
 export const checkoutApi = {
@@ -327,7 +342,28 @@ export const checkoutApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
+  createGuestOrder: (data: {
+    items: Array<{
+      productId: string
+      name: string
+      price: number
+      quantity: number
+      color: string
+      image?: string
+    }>
+    discountCode?: string
+    paymentMethod?: string
+    userName: string
+    userEmail: string
+    userPhone: string
+    shippingAddress: string
+  }): Promise<CheckoutResponse> =>
+    fetchApi<CheckoutResponse>("/api/v1/checkout/guest", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   handleVnpayReturn: (queryParams: Record<string, string>): Promise<{
     msg: string
     orderId: string
@@ -353,18 +389,18 @@ export const reviewsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   getAll: (): Promise<ReviewsResponse> => fetchApi<ReviewsResponse>("/api/v1/reviews"),
-  
+
   getById: (id: string): Promise<{ review: Review }> =>
     fetchApi<{ review: Review }>(`/api/v1/reviews/${id}`),
-  
+
   update: (id: string, data: { rating?: number; title?: string; comment?: string }): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/reviews/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   delete: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/reviews/${id}`, {
       method: "DELETE",
@@ -374,11 +410,11 @@ export const reviewsApi = {
 export const discountsApi = {
   getAll: (): Promise<{ total_discounts: number; discounts: Discount[] }> =>
     fetchApi<{ total_discounts: number; discounts: Discount[] }>("/api/v1/discounts"),
-  
+
   getById: (id: string): Promise<{ discount: Discount }> =>
     fetchApi<{ discount: Discount }>(`/api/v1/discounts/${id}`),
-  
-  
+
+
   create: (data: {
     code: string
     discountType: "percent" | "fixed"
@@ -394,7 +430,7 @@ export const discountsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  
+
   update: (id: string, data: {
     code?: string
     discountType?: "percent" | "fixed"
@@ -410,7 +446,7 @@ export const discountsApi = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
-  
+
   delete: (id: string): Promise<{ msg: string }> =>
     fetchApi<{ msg: string }>(`/api/v1/discounts/${id}`, {
       method: "DELETE",
