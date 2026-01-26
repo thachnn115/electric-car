@@ -301,6 +301,11 @@ export const ordersApi = {
       method: "DELETE",
     }),
 
+  cancel: (id: string): Promise<{ order: Order }> =>
+    fetchApi<{ order: Order }>(`/api/v1/orders/${id}/cancel`, {
+      method: "PATCH",
+    }),
+
   createOfflineAdmin: (data: {
     items: Array<{ productId: string; quantity: number; color: string }>
     discountCode?: string

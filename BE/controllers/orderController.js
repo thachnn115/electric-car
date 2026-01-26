@@ -220,6 +220,47 @@ const createOrderOfflineAdmin = async (req, res) => {
   res.status(StatusCodes.CREATED).json({ order })
 }
 
+const userCancelOrder = async (req, res) => {
+  const { id: orderId } = req.params
+  const order = await Order.findById(orderId)
+
+  if (!order) {
+    throw new CustomError.NotFoundError("Không tìm thấy đơn hàng")
+  }
+
+  // Check permissions - only the user who created it can cancel
+  checkPermissions(req.user, order.user)
+
+  // Validation logic
+  if (order.status === "cancelled") {
+    throw new CustomError.BadRequestError("Đơn hàng đã được hủy trước đó")
+  }
+
+  if (order.status !== "pending") {
+    throw new CustomError.BadRequestError("Chỉ có thể hủy đơn hàng khi trạng thái là Chờ xử lý")
+  }
+
+  const now = new Date()
+  const createdAt = new Date(order.createdAt)
+  const hoursSinceCreated = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60)
+
+  if (order.paymentMethod === "VNPAY") {
+    if (order.paymentStatus === "paid") {
+      throw new CustomError.BadRequestError("Không thể hủy đơn hàng đã thanh toán qua VNPAY")
+    }
+    if (hoursSinceCreated > 24) {
+      throw new CustomError.BadRequestError("Đã quá 24h kể từ khi đặt hàng, không thể tự hủy đơn hàng này")
+    }
+  } else if (order.paymentMethod === "COD") {
+    // For COD, if it's already confirmed (not pending), it's caught by the status !== "pending" check above
+  }
+
+  order.status = "cancelled"
+  await order.save()
+
+  res.status(StatusCodes.OK).json({ order, msg: "Hủy đơn hàng thành công" })
+}
+
 module.exports = {
   getAllOrders,
   getSingleOrder,
@@ -228,4 +269,5 @@ module.exports = {
   updateOrder,
   deleteOrder,
   createOrderOfflineAdmin,
+  userCancelOrder,
 }

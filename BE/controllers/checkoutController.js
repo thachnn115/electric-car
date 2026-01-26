@@ -107,7 +107,7 @@ const createOrderFromCart = async (req, res) => {
   if (paymentMethod === "COD") {
     const order = await Order.create({
       ...baseOrder,
-      status: "confirmed",
+      status: "pending",
       paymentStatus: "pending",
     })
     if (discountDoc) {
@@ -204,7 +204,7 @@ const createGuestOrder = async (req, res) => {
   if (paymentMethod === "COD") {
     const order = await Order.create({
       ...baseOrder,
-      status: "confirmed",
+      status: "pending",
       paymentStatus: "pending",
     })
     if (discountDoc) {

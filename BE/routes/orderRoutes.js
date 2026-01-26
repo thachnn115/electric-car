@@ -11,6 +11,7 @@ const {
   updateOrder,
   deleteOrder,
   createOrderOfflineAdmin,
+  userCancelOrder,
 } = require("../controllers/orderController")
 
 router
@@ -23,6 +24,8 @@ router
   .post(authenticateUser, authorizePermissions("admin"), createOrderOfflineAdmin)
 
 router.route("/showAllMyOrders").get(authenticateUser, getCurrentUserOrder)
+
+router.patch("/:id/cancel", authenticateUser, userCancelOrder)
 
 router
   .route("/:id")

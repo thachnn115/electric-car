@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, use } from "react"
-import { notFound, useRouter } from "next/navigation"
+import { notFound } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,7 @@ import { getErrorMessage } from "@/lib/error-handler"
 import { getProductName, getProductImage } from "@/lib/product-helpers"
 import type { Order } from "@/lib/types"
 import { toast } from "sonner"
-import { ArrowLeft, Package, MapPin, Phone, Mail, Calendar, CreditCard, Loader2 } from "lucide-react"
+import { ArrowLeft, Package, MapPin, Calendar, CreditCard, Loader2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -40,35 +40,48 @@ export default function OrderDetailPage({ params }: OrderPageProps) {
   const resolvedParams = use(params)
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  const fetchOrder = async () => {
+    try {
+      setIsLoading(true)
+      // Attempt to get order detail
+      const response = await ordersApi.getById(resolvedParams.id).catch(async () => {
+        // Fallback to user's orders if direct fetch fails
+        const myOrdersResponse = await ordersApi.getMyOrders()
+        const foundOrder = myOrdersResponse.orders.find((o) => o._id === resolvedParams.id)
+        if (!foundOrder) throw new Error("Không tìm thấy đơn hàng")
+        return { order: foundOrder }
+      })
+      setOrder(response.order)
+    } catch (error) {
+      toast.error(getErrorMessage(error) || "Không thể tải thông tin đơn hàng")
+      notFound()
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        setIsLoading(true)
-        // Try to get order detail - if user is not admin, try to get from my orders
-        try {
-          const response = await ordersApi.getById(resolvedParams.id)
-          setOrder(response.order)
-        } catch (error) {
-          // If getById fails (might require admin), try to get from user's orders
-          const myOrdersResponse = await ordersApi.getMyOrders()
-          const foundOrder = myOrdersResponse.orders.find((o) => o._id === resolvedParams.id)
-          if (foundOrder) {
-            setOrder(foundOrder)
-          } else {
-            throw new Error("Không tìm thấy đơn hàng")
-          }
-        }
-      } catch (error) {
-        toast.error(getErrorMessage(error) || "Không thể tải thông tin đơn hàng")
-        notFound()
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchOrder()
   }, [resolvedParams.id])
+
+  const handleCancelOrder = async () => {
+    if (!order) return
+    const confirmed = globalThis.confirm("Bạn có chắc chắn muốn hủy đơn hàng này không?")
+    if (!confirmed) return
+
+    try {
+      setIsCancelling(true)
+      await ordersApi.cancel(order._id)
+      toast.success("Hủy đơn hàng thành công")
+      await fetchOrder()
+    } catch (error) {
+      toast.error(getErrorMessage(error) || "Không thể hủy đơn hàng")
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -92,6 +105,24 @@ export default function OrderDetailPage({ params }: OrderPageProps) {
   const statusInfo = statusConfig[order.status]
   const paymentInfo = paymentStatusConfig[order.paymentStatus]
 
+  const canCancel = (() => {
+    if (order.status !== "pending") return false
+
+    if (order.paymentMethod === "COD") {
+      return order.status === "pending"
+    }
+
+    if (order.paymentMethod === "VNPAY") {
+      if (order.paymentStatus === "paid") return false
+      const now = new Date()
+      const createdAt = new Date(order.createdAt || "")
+      const hoursSinceCreated = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60)
+      return hoursSinceCreated <= 24
+    }
+
+    return false
+  })()
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -111,9 +142,29 @@ export default function OrderDetailPage({ params }: OrderPageProps) {
                 <h1 className="text-3xl font-bold tracking-tight">Chi tiết đơn hàng</h1>
                 <p className="text-muted-foreground mt-1">Mã đơn hàng: {order._id}</p>
               </div>
-              <div className="flex gap-2">
-                <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-                <Badge variant={paymentInfo.variant}>{paymentInfo.label}</Badge>
+              <div className="flex flex-col gap-2 items-end">
+                <div className="flex gap-2">
+                  <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                  <Badge variant={paymentInfo.variant}>{paymentInfo.label}</Badge>
+                </div>
+                {canCancel && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="mt-2"
+                    onClick={handleCancelOrder}
+                    disabled={isCancelling}
+                  >
+                    {isCancelling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Đang hủy...
+                      </>
+                    ) : (
+                      "Hủy đơn hàng"
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -131,7 +182,7 @@ export default function OrderDetailPage({ params }: OrderPageProps) {
                 <CardContent>
                   <div className="space-y-4">
                     {order.orderItems.map((item, index) => (
-                      <div key={index} className="flex gap-4 pb-4 border-b last:border-b-0">
+                      <div key={`${item.product}-${index}`} className="flex gap-4 pb-4 border-b last:border-b-0">
                         <div className="relative h-20 w-20 rounded-lg overflow-hidden bg-muted shrink-0">
                           <Image
                             src={getProductImage(item)}
@@ -226,12 +277,12 @@ export default function OrderDetailPage({ params }: OrderPageProps) {
                       <span>
                         {order.createdAt
                           ? new Date(order.createdAt).toLocaleDateString("vi-VN", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : "N/A"}
                       </span>
                     </div>
